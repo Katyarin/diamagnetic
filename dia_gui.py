@@ -285,6 +285,9 @@ while True:
         color_count = 0
         window['-err_text-'].update('', background_color=None)
         window['ReCalc'].update(visible=False)
+        for ax in ch_ax:
+            ax.cla()
+        checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
         for ax in axs:
             for subax in ax:
                 subax.clear()
@@ -302,7 +305,7 @@ while True:
         window['ReCalc'].update(visible=False)
         for ax in ch_ax:
             ax.cla()
-        checked_fig.subplots_adjust(left=0.062, bottom=0.26, right=0.95, top=0.843, wspace=0.126, hspace=0)
+        checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
         data, shotn, rec = data_open(values)
         if int(shotn * rec):
             draw_data(data, shotn, color_count)

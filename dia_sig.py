@@ -144,6 +144,7 @@ def dia_data(shot, recoupment, ax):
     beta_N_list = []
     psi_res_list = []
     psi_ind_list = []
+    Ipl_list = []
     for j, p in enumerate(time):
         Itf = average_1ms(diamagnetic_sig['time'], data['Itf (2TF)(инт.23)']['data'], p)
         Bt = 0.2 * 16 * Itf / 1e6 / Rav[j]
@@ -151,6 +152,7 @@ def dia_data(shot, recoupment, ax):
         dia = average_1ms(diamagnetic_sig['time'], diamagnetic_sig['data'], p)
         dia_sig_mcc.append(dia)
         Ipl = average_1ms(diamagnetic_sig['time'], Ip_all, p)
+        Ipl_list.append(Ipl)
         #print(Ipl)
         beta_dia = 1 - (k[j] * k[j] + 1) / (2 * k[j]) * Bt * dia / (20 * pi * Ipl / 1e6 * Ipl / 1e6)
         beta_dia_list.append(beta_dia)
@@ -176,7 +178,7 @@ def dia_data(shot, recoupment, ax):
     psi_res_list[0] = 0
     return {'data': {'time': time, 'data': {'Bt': Bt_list, 'beta_dia': beta_dia_list, 'W_dia': W_dia_list, 'li': li_list,
                                             'dia_sig': dia_sig_mcc, 'Bv': [abs(i*1e-4) for i in Bzav], 'Lp': [i*1e9 for i in Li_list], 'Psi_av': Psav, 'psiInd': psi_ind_list,
-                                            'psiRes': psi_res_list, 'beta_t': beta_t_list, 'beta_N': beta_N_list},
+                                            'psiRes': psi_res_list, 'beta_t': beta_t_list, 'beta_N': beta_N_list, 'Ipl': Ipl_list, 'Rav': Rav},
                      'dimensions': {'Bt': 'T', 'beta_dia': '%', 'W_dia': 'J', 'li': '%',
                                             'dia_sig': 'mWb', 'Bv': 'T', 'Lp': 'nH', 'Psi_av': 'Wb', 'psiInd': 'Wb',
-                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'm*T/MA'}}, 'error': None}
+                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'm*T/MA', 'Ipl': 'A', 'Rav': 'm'}}, 'error': None}
