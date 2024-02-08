@@ -38,7 +38,9 @@ layout = [  [sg.Text('Для расчета введите номер разря
             [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
             [sg.Button('Ok', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
             [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
-            [sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)], [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]]
+            [sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)],
+            [sg.Slider(orientation='h', expand_x=True, key='-SL_min-'), sg.Slider(orientation='h', expand_x=True, key='-sl-max-', default_value=240)],
+            [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]]
 
 window = sg.Window('Расчет данных по диамагнитному сигналу', layout, resizable=True, finalize=True)
 
@@ -229,7 +231,7 @@ def draw_data(data, shotn, color_count, VAL):
         axs[2, 2].set_ylabel(r'$\Psi, Wb$')
         axs[3, 2].set_ylabel(r'$\Delta\Psi, Wb$')
         axs[2, 1].set_ylabel(r'$\beta_{T}, %$')
-        axs[3, 1].set_ylabel(r'$\beta_{N}, m \cdot T / MA$')
+        axs[3, 1].set_ylabel(r'$\beta_{N}, mm \cdot T / A$')
         #axs[3, 0].set_ylim(0, 2)
         axs[3, 0].set_xlabel('time, s')
         axs[3, 1].set_xlabel('time, s')
@@ -249,6 +251,9 @@ def draw_data(data, shotn, color_count, VAL):
         ax_tuple = tuple(ax_list)
         cursor = MultiCursor(fig.canvas, ax_tuple, color='r', lw=0.5, horizOn=False, vertOn=True)
         plot_right.draw()
+        window['-SL_min-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
+        window['-sl-max-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
+        window['-sl-max-'].update(value=(max(data['data']['time'])*1e3))
         '''elif data['error'] == "MCC file does not exist":
         MCC_create(VAL)'''
     else:
@@ -339,6 +344,8 @@ data = {}
 shotn = 0
 rec = 0
 window.Maximize()
+window['-SL_min-'].bind('<ButtonRelease-1>', ' Release')
+window['-sl-max-'].bind('<ButtonRelease-1>', ' Release')
 
 while True:
     event, values = window.read()
@@ -428,6 +435,11 @@ while True:
         if int(shotn*rec):
             draw_data(data, shotn, color_count, values)
         #color_count = 0
+
+    if event == '-SL_min- Release' or event == '-sl-max- Release':
+        print(values['-SL_min-'])
+        axs[3,0].set_xlim((values['-SL_min-']/1e3), (values['-sl-max-']/1e3))
+        plot_right.draw()
 
 
     if event == sg.WIN_CLOSED: # if user closes window or clicks cancel
