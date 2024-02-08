@@ -6,6 +6,9 @@ import json
 import numpy as np
 import shtRipper
 import os
+import requests
+from matplotlib.widgets import MultiCursor
+
 
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
@@ -19,11 +22,12 @@ color_list = ['b', 'r', 'm', 'g', 'black']
 color_list2 = ['cyan', 'orange', 'pink', 'olive', 'gray']
 data_add = {'dimensions': {'Bt': 'T', 'beta_dia': '%', 'W_dia': 'J', 'li': '%',
                                             'dia_sig': 'mWb', 'Bv': 'T', 'Lp': 'nH', 'Psi_av': 'Wb', 'psiInd': 'Wb',
-                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'm*T/MA'}, 'error': None}
+                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%'}, 'error': None}
 
 #PATH_for_save_PUB = '//172.16.12.127/Pub/!diamagnetic_data'
 #PATH_for_save = 'c:/work/Data/diamagnetic_data/'
 #PATH_for_save = 'c:/work/Data/diamagnetic_data/'
+CFM_ADDR = 'http://172.16.12.150:8050/_dash-update-component'
 
 with open('settings.json', 'r') as set_file:
     settings = json.load(set_file)
@@ -77,7 +81,7 @@ def deffinition():
     axDef.text(0.2, 0.45, r'$\Psi_{av}$ - магнитный поток, усредненный по кольцам', fontsize=16)
     axDef.text(0.2, 0.375, r'$\Psi_{ind} = I_{p} \cdot L_{p}$', fontsize=16)
     axDef.text(0.2, 0.3, r'$\Psi_{res} = \Psi_{av} - \Psi_{ind}$', fontsize=16)
-    axDef.text(0.2, 0.225, r'$\beta_{T} = \frac{4\mu_0 \cdot W_{dia}}{3\cdot B_{T} \cdot V}$', fontsize=16)
+    axDef.text(0.2, 0.225, r'$\beta_{T} = \frac{4\mu_0 \cdot W_{dia}}{3\cdot B_{T}^2 \cdot V}$', fontsize=16)
     axDef.text(0.2, 0.15, r'$\beta_{N} = \frac{100\cdot a \cdot B_T \cdot \beta_T}{I_p}$', fontsize=16)
     axDef.text(0.2, 0.1, r'где $I_{tf}$ - ток в катушках тороидального магнитного поля,', fontsize=10)
     axDef.text(0.2, 0.075, r'$R_{av}$ - радиус центра тяжести токовых колец,', fontsize=10)
@@ -143,7 +147,7 @@ checked_fig, ch_ax = plt.subplots(2, 1, sharex=True, figsize=(10, 6))
 
 def check_page():
     layout = [[sg.Text('Проверьте, что параметры разряда-вычета соответсвуют разряду и, если все в порядке, нажмите ОК', font=16)],
-        [sg.Canvas(key='-plot1-')], [sg.Button('OK', font=16)]]
+        [sg.Canvas(key='-plot1-')], [sg.Button('OK', font=16), sg.Button('Cancel', font=16, button_color='red')]]
 
     window_check = sg.Window('Проверка соответствия разряда вычета требуемому разряду', layout, resizable=True, finalize=True)
     plot_left = draw_figure(window_check['-plot1-'].TKCanvas, checked_fig)
@@ -154,25 +158,31 @@ def check_page():
 
     while True:
         event, values = window_check.read()
+        if event == 'Cancel':
+            window_check.close()
+            return 0
         if event == sg.WIN_CLOSED or event=='OK':
-            break
-    window_check.close()
+            window_check.close()
+            return 1
+    #window_check.close()
 
 
-fig, axs = plt.subplots(4, 2, sharex=True, figsize=((screen_size[0]*px, screen_size[1]*0.8*px)))
+fig, axs = plt.subplots(4, 3, sharex=True, figsize=((screen_size[0]*px, screen_size[1]*0.8*px)))
 plot_right = draw_figure(window['-plot2-'].TKCanvas, fig)
 make_canvas_interactive(plot_right)
 color_count = 0
 
 
-def draw_data(data, shotn, color_count):
+def draw_data(data, shotn, color_count, VAL):
     if data['error'] == None:
-        axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
+        #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
         axs[0, 0].plot(data['data']['time'], data['data']['data']['Bv'], '--', label='Bv %i' %shotn, color=color_list[color_count])
         axs[1, 0].plot(data['data']['time'], data['data']['data']['beta_dia'], label=shotn, color=color_list[color_count])
         axs[2, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=shotn, color=color_list[color_count])
-        axs[3, 0].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
-        axs[0, 1].plot(data['data']['time'], data['data']['data']['Lp'], label=shotn, color=color_list[color_count])
+        axs[3, 0].plot([i/1000 for i in data['shafr_int_meth']['time']], [i/1000 for i in data['shafr_int_meth']['W']], label=shotn, color=color_list[color_count])
+
+        axs[0, 1].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
+        axs[1, 1].plot(data['data']['time'], data['data']['data']['Lp'], label=shotn, color=color_list[color_count])
         axs[2, 1].plot(data['data']['time'], data['data']['data']['beta_t'], label=shotn, color=color_list[color_count])
         axs[3, 1].plot(data['data']['time'], data['data']['data']['beta_N'], label=shotn, color=color_list[color_count])
 
@@ -194,42 +204,53 @@ def draw_data(data, shotn, color_count):
                        [data['data']['data']['psiRes'][-1] - data['data']['data']['psiRes'][-2]],
                        label=r'$\Delta \Psi_{res}$ %i' % shotn)'''
 
-
-        axs[1, 1].plot(data['data']['time'], data['data']['data']['Psi_av'], '--', label=r'$\Psi_{av}$ %i' %shotn, color=color_list[color_count])
-        axs[1, 1].plot(data['data']['time'], data['data']['data']['psiInd'], '-', label=r'$\Psi_{ind}$ %i' %shotn, color=color_list[color_count])
-        axs[1, 1].plot(data['data']['time'], data['data']['data']['psiRes'], '.', label=r'$\Psi_{res}$ %i' %shotn, color=color_list2[color_count])
+        axs[0, 2].plot(data['data']['time'], data['data']['data']['k'], label=shotn, color=color_list[color_count])
+        axs[1, 2].plot(data['data']['time'], data['data']['data']['tr_up'], label=r'$\delta_{up}$ %i' %shotn, color=color_list[color_count])
+        axs[1, 2].plot(data['data']['time'], data['data']['data']['tr_down'], '--', label=r'$\delta_{down}$ %i' %shotn, color=color_list[color_count])
+        axs[2, 2].plot(data['data']['time'], data['data']['data']['Psi_av'], '-', label=r'$\Psi_{av}$ %i' %shotn, color=color_list[color_count])
+        axs[3, 2].plot(data['data']['time'], data['data']['data']['psiInd'], '-', label=r'$\Delta\Psi_{ind}$ %i' %shotn, color=color_list[color_count])
+        axs[3, 2].plot(data['data']['time'], data['data']['data']['psiRes'], '--', label=r'$\Delta\Psi_{res}$ %i' %shotn, color=color_list[color_count])
 
 
         axs[0, 0].set_ylabel(r'$B, T$')
         #axs[0, 0].set_xlim(0.110, 0.3)
-        axs[0, 0].set_ylim(0, 1)
+        #axs[0, 0].set_ylim(0, 1)
         axs[1, 0].set_ylabel(r'$\beta_{dia}$')
-        axs[1, 0].set_ylim(0, 0.6)
+        #axs[1, 0].set_ylim(0, 0.6)
         axs[2, 0].set_ylabel(r'$W_{dia}, kJ$')
-        axs[2, 0].set_ylim(0, 20)
-        axs[3, 0].set_ylabel(r'$l_{i}$')
-        axs[3, 0].set_ylim(0, 2)
-        axs[0, 1].set_ylabel(r'$L_{p}, nH$')
-        axs[1, 1].set_ylabel(r'$\Psi, Wb$')
+        axs[3, 0].set_ylabel(r'$W_{shafr}, kJ$')
+        #axs[2, 0].set_ylim(0, 20)
+
+        axs[0, 1].set_ylabel(r'$l_{i}$')
+        #axs[3, 0].set_ylim(0, 2)
+        axs[1, 1].set_ylabel(r'$L_{p}, nH$')
+        axs[0, 2].set_ylabel(r'$\kappa$')
+        axs[1, 2].set_ylabel(r'$\delta$')
+        axs[2, 2].set_ylabel(r'$\Psi, Wb$')
+        axs[3, 2].set_ylabel(r'$\Delta\Psi, Wb$')
         axs[2, 1].set_ylabel(r'$\beta_{T}, %$')
         axs[3, 1].set_ylabel(r'$\beta_{N}, m \cdot T / MA$')
         #axs[3, 0].set_ylim(0, 2)
         axs[3, 0].set_xlabel('time, s')
         axs[3, 1].set_xlabel('time, s')
+        axs[3, 2].set_xlabel('time, s')
 
         count =0
         for ax in axs:
             for subax in ax:
                 subax.legend()
-                if count in [2, 3, 6, 7]:
+                if count in [3, 4, 5, 9, 10, 11]:
                     #subax.yaxis.set_label_position("right")
                     subax.yaxis.tick_right()
                 count+=1
-
-        '''checked_fig.suptitle('shot #%i' % shotn, fontsize=16)
-
-        plot_left.draw()'''
+        ax_list = []
+        for ax in axs:
+            ax_list.extend([subax for subax in ax])
+        ax_tuple = tuple(ax_list)
+        cursor = MultiCursor(fig.canvas, ax_tuple, color='r', lw=0.5, horizOn=False, vertOn=True)
         plot_right.draw()
+        '''elif data['error'] == "MCC file does not exist":
+        MCC_create(VAL)'''
     else:
         window['-err_text-'].update('ОШИБКА!!! %s' %data['error'], background_color='red')
 
@@ -270,8 +291,48 @@ def data_open(values, ReCalc=False):
 
             if rec * shotn:
                 data = dia_sig.dia_data(shotn, rec, ch_ax)
-                check_page()
+                check = check_page()
+                shotn = check*shotn
     return data, shotn, rec
+
+
+def MCC_create(VAL):
+    layout = [[sg.Text('MCC data calculation...')],
+              [sg.Cancel(), sg.Text(key='-no_mcc-')]]
+    mcc_window = sg.Window('MCC data calculation...', layout=layout)
+    while True:
+        event, values = mcc_window.read()
+        serv_resp = requests.post(CFM_ADDR, json={
+            'changedPropIds': ["btn-2.n_clicks"],
+            'inputs': [
+                {
+                    'id': "btn-2",
+                    'property': "n_clicks",
+                    'value': 1
+                }
+            ],
+            'output': "my-output1.children",
+            'outputs': {
+                'id': "my-output1",
+                'property': "children"
+            },
+            'state': [
+                {
+                    'id': "shot_number_input",
+                    'property': "value",
+                    'value': int(VAL['-SHOT-'])}
+            ]
+        })
+
+        if serv_resp.json()['response']['my-output1']['children'].startswith(' Good! '):
+            data, shotn, rec = data_open(VAL)
+            if int(shotn * rec):
+                draw_data(data, shotn, color_count, VAL)
+            mcc_window.close()
+        mcc_window['-no_mcc-'].update(serv_resp.json()['response']['children'])
+        if event == sg.WIN_CLOSED:
+            break
+    mcc_window.close()
 
 
 data = {}
@@ -292,10 +353,10 @@ while True:
             for subax in ax:
                 subax.clear()
                 subax.grid()
-        fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.126, hspace=0)
+        fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values)
         if int(shotn*rec):
-            draw_data(data, shotn, color_count)
+            draw_data(data, shotn, color_count, values)
 
     if event == 'Append':
         color_count += 1
@@ -308,7 +369,7 @@ while True:
         checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
         data, shotn, rec = data_open(values)
         if int(shotn * rec):
-            draw_data(data, shotn, color_count)
+            draw_data(data, shotn, color_count, values)
 
     if event == 'Save':
         PATH_for_save = settings['path_out']
@@ -362,10 +423,10 @@ while True:
             for subax in ax:
                 subax.clear()
                 subax.grid()
-        fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.126, hspace=0)
+        fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values, ReCalc=True)
         if int(shotn*rec):
-            draw_data(data, shotn, color_count)
+            draw_data(data, shotn, color_count, values)
         #color_count = 0
 
 

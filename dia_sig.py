@@ -34,11 +34,12 @@ def average_1ms(listTime, listData, time):
 def get_sht_data(Shotn, data_name):
     with open('settings.json', 'r') as set_file:
         settings = json.load(set_file)
-    try:
-        filename = settings['path_in'] % Shotn
-    except FileNotFoundError:
-        filename = settings['path_in_new'] % Shotn
+    filename = settings['path_in'] % Shotn
     res = shtRipper.ripper.read(filename, data_name)
+    if 'err' in list(res.keys()):
+        filename = settings['path_in_new'] % Shotn
+        res = shtRipper.ripper.read(filename, data_name)
+
     if 'err' in list(res.keys()):
         return {'err': res['err']}
     smooth_res = {}
@@ -114,25 +115,28 @@ def dia_data(shot, recoupment, ax):
     I_c = []
     Psav = []
     Vp = []
-    min_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(min([abs(i) for i in data_mcc['Psav']['variable']]))
-    max_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(max([abs(i) for i in data_mcc['Psav']['variable']]))
-    for i, el in enumerate([abs(i) for i in data_mcc['Psav']['variable']]):
-        if max_ind > i > min_ind:
-            time.append(data_mcc['time']['variable'][i])
-            Bzav.append(data_mcc['Bzav']['variable'][i])
-            r_c.append(data_mcc['current_coils']['r']['variable'][i])
-            rb.append(data_mcc['boundary']['rbdy']['variable'][i])
-            zb.append(data_mcc['boundary']['zbdy']['variable'][i])
-            Ip.append(data_mcc['Ipl']['variable'][i])
-            I_c.append(data_mcc['current_coils']['I']['variable'][i])
-            Psav.append(el)
-            Vp.append(data_mcc['Vp']['variable'][i])
+    #min_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(min([abs(i) for i in data_mcc['Psav']['variable']]))
+    #max_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(max([abs(i) for i in data_mcc['Psav']['variable']]))
+    for i, el in enumerate([-i for i in data_mcc['Psav']['variable']]):
+        time.append(data_mcc['time']['variable'][i])
+        Bzav.append(data_mcc['Bzav']['variable'][i])
+        r_c.append(data_mcc['current_coils']['r']['variable'][i])
+        rb.append(data_mcc['boundary']['rbdy']['variable'][i])
+        zb.append(data_mcc['boundary']['zbdy']['variable'][i])
+        Ip.append(data_mcc['Ipl']['variable'][i])
+        I_c.append(data_mcc['current_coils']['I']['variable'][i])
+        Psav.append(el+data_mcc['Psav']['variable'][0])
+        Vp.append(data_mcc['Vp']['variable'][i])
 
     Rav = [sum([r_c[index_time][i] * I_c[index_time][i] for i in range(len(r_c[index_time]))]) / Ip[index_time] / 100 for index_time in range(len(time))]
 
     k = [(max(zb[index_time][1:]) - min(zb[index_time])) / (max(rb[index_time]) - min(rb[index_time])) for index_time in range(len(time))]
 
     a = [(max(rb[index_time][1:]) - min(rb[index_time][1:])) / 200 for index_time in range(len(time))]
+
+    tr_up = [(Rav[i] - rb[i][zb[i].index(max(zb[i]))]/100)/a[i] for i in range(len(time))]
+
+    tr_down = [(Rav[i] - rb[i][zb[i].index(min(zb[i]))]/100)/a[i] for i in range(len(time))]
 
     Bt_list = []
     beta_dia_list = []
@@ -171,14 +175,16 @@ def dia_data(shot, recoupment, ax):
         psi_res_list.append(Psav[j] - psi_ind)
         beta_t = 1.6 * pi * W *1e-4 / (3*Bt*Bt*Vp[j])
         beta_t_list.append(beta_t)
-        beta_N_list.append(100*Bt*a[j]*beta_t/Ipl/1e6)
+        beta_N_list.append(100*Bt*a[j]*beta_t*1e3/Ipl)
 
-
+    print(beta_N_list)
     psi_ind_list[0] = 0
     psi_res_list[0] = 0
     return {'data': {'time': time, 'data': {'Bt': Bt_list, 'beta_dia': beta_dia_list, 'W_dia': W_dia_list, 'li': li_list,
                                             'dia_sig': dia_sig_mcc, 'Bv': [abs(i*1e-4) for i in Bzav], 'Lp': [i*1e9 for i in Li_list], 'Psi_av': Psav, 'psiInd': psi_ind_list,
-                                            'psiRes': psi_res_list, 'beta_t': beta_t_list, 'beta_N': beta_N_list, 'Ipl': Ipl_list, 'Rav': Rav},
+                                            'psiRes': psi_res_list, 'beta_t': beta_t_list, 'beta_N': beta_N_list, 'Ipl': Ipl_list, 'Rav': Rav, 'k': k, 'tr_up': tr_up, 'tr_down': tr_down},
                      'dimensions': {'Bt': 'T', 'beta_dia': '%', 'W_dia': 'J', 'li': '%',
                                             'dia_sig': 'mWb', 'Bv': 'T', 'Lp': 'nH', 'Psi_av': 'Wb', 'psiInd': 'Wb',
-                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'm*T/MA', 'Ipl': 'A', 'Rav': 'm'}}, 'error': None}
+                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%'}},
+            'shafr_int_meth': {'time': data_mcc['shafr_int_method']['time']['variable'], 'W': data_mcc['shafr_int_method']['w_eq']['variable']},
+            'error': None}
