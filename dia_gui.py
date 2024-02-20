@@ -8,12 +8,52 @@ import shtRipper
 import os
 import requests
 from matplotlib.widgets import MultiCursor
+import numpy as np
 
 
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
     y_smooth = np.convolve(y, box, mode='same')
     return y_smooth
+
+
+'''def autoscale_y(axis,margin=0.1):
+    """This function rescales the y-axis based on the data that is visible given the current xlim of the axis.
+    ax -- a matplotlib axes object
+    margin -- the fraction of the total height of the y-data to pad the upper and lower ylims"""
+
+    def get_bottom_top(line):
+        xd = list(line.get_xdata())
+        yd = list(line.get_ydata())
+        lo,hi = axis.get_xlim()
+        #y_displayed = yd[((xd>lo) & (xd<hi))]
+        mini = 0
+        maxi = 0
+        for i, el in enumerate(xd):
+            if el >= lo:
+                mini = i
+            break
+        for i, el in enumerate(xd):
+            if el >= hi:
+                maxi = i
+            break
+        print(mini, maxi)
+        y_displayed = yd[mini:maxi]
+        h = max(y_displayed) - min(y_displayed)
+        bot = min(y_displayed)-margin*h
+        top = max(y_displayed)+margin*h
+        return bot,top
+
+    lines = axis.get_lines()
+    bot,top = np.inf, -np.inf
+
+    for line in lines:
+        new_bot, new_top = get_bottom_top(line)
+        if new_bot < bot: bot = new_bot
+        if new_top > top: top = new_top
+
+    axis.set_ylim(bot,top)'''
+
 
 plt.rcParams['axes.facecolor']='#E3F2FD'
 plt.rcParams['figure.facecolor']='#E3F2FD'
@@ -32,14 +72,16 @@ CFM_ADDR = 'http://172.16.12.150:8050/_dash-update-component'
 with open('settings.json', 'r') as set_file:
     settings = json.load(set_file)
 
-
 sg.theme('Material1')
+list_of_checkbokes = [[sg.vtop(sg.Text('История', font=16))]]
+for i in range(20):
+    list_of_checkbokes.append([sg.vtop(sg.Checkbox('', key='%icheck' %i, font=16, visible=False, enable_events=True))])
 layout = [  [sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
             [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
             [sg.Button('Ok', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
             [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
-            [sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)],
-            [sg.Slider(orientation='h', expand_x=True, key='-SL_min-'), sg.Slider(orientation='h', expand_x=True, key='-sl-max-', default_value=240)],
+            [sg.Column([[sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)], [sg.Slider(orientation='h', expand_x=True, key='-SL_min-'), sg.Slider(orientation='h', expand_x=True, key='-sl-max-', default_value=240)]], expand_x=True, expand_y=True),
+             sg.vtop(sg.Column(list_of_checkbokes), expand_x=True, expand_y=True)],
             [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]]
 
 window = sg.Window('Расчет данных по диамагнитному сигналу', layout, resizable=True, finalize=True)
@@ -174,11 +216,13 @@ plot_right = draw_figure(window['-plot2-'].TKCanvas, fig)
 make_canvas_interactive(plot_right)
 color_count = 0
 
-
-def draw_data(data, shotn, color_count, VAL):
+active_list = []
+history_list = {}
+history_ind = 0
+def draw_data(data, shotn, color_count):
     if data['error'] == None:
         #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
-        axs[0, 0].plot(data['data']['time'], data['data']['data']['Bv'], '--', label='Bv %i' %shotn, color=color_list[color_count])
+        axs[0, 0].plot(data['data']['time'], data['data']['data']['Bv'], '-', label='Bv %i' %shotn, color=color_list[color_count])
         axs[1, 0].plot(data['data']['time'], data['data']['data']['beta_dia'], label=shotn, color=color_list[color_count])
         axs[2, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=shotn, color=color_list[color_count])
         axs[3, 0].plot([i/1000 for i in data['shafr_int_meth']['time']], [i/1000 for i in data['shafr_int_meth']['W']], label=shotn, color=color_list[color_count])
@@ -254,23 +298,24 @@ def draw_data(data, shotn, color_count, VAL):
         window['-SL_min-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
         window['-sl-max-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
         window['-sl-max-'].update(value=(max(data['data']['time'])*1e3))
+        window['-SL_min-'].update(value=(min(data['data']['time'])*1e3))
         '''elif data['error'] == "MCC file does not exist":
         MCC_create(VAL)'''
     else:
-        window['-err_text-'].update('ОШИБКА!!! %s' %data['error'], background_color='red')
+        window['-err_text-'].update('ОШИБКА!!! %s' %data['error'], background_color='red', text_color='white', visible=True)
 
 
 def data_open(values, ReCalc=False):
     try:
         shotn = int(values['-SHOT-'])
     except:
-        window['-err_text-'].update('ОШИБКА! Введите целочисленный номер разряда', background_color='red')
+        window['-err_text-'].update('ОШИБКА! Введите целочисленный номер разряда', background_color='red', text_color='white', visible=True)
         shotn = 0
     if ReCalc:
         try:
             rec = int(values['-RECSHOT-'])
         except:
-            window['-err_text-'].update('ОШИБКА! Введите целочисленный номер вычета', background_color='red')
+            window['-err_text-'].update('ОШИБКА! Введите целочисленный номер вычета', background_color='red', text_color='white', visible=True)
             rec = 0
 
         if rec * shotn:
@@ -282,15 +327,15 @@ def data_open(values, ReCalc=False):
             with open('%sjson/%i.json' % (PATH_for_save, shotn), 'r') as json_f:
                 data_new = json.load(json_f)
             data = {'data': {'time': data_new['time'], 'data': data_new['data'], 'dimensions': data_add['dimensions']},
-                    'error': data_add['error']}
+                    'error': data_add['error'], 'shafr_int_meth': data_new['shafr_int_meth']}
             rec = data_new['compensation']
-            window['-err_text-'].update('Данные загружены из базы данных (вычет: %i), если хотите пересчитать, введите номер вычета и нажмите ReCalc' %rec, background_color='green')
+            window['-err_text-'].update('Данные загружены из базы данных (вычет: %i), если хотите пересчитать, введите номер вычета и нажмите ReCalc' %rec, background_color='green', text_color='white', visible=True)
             window['ReCalc'].update(visible=True)
         except:
             try:
                 rec = int(values['-RECSHOT-'])
             except:
-                window['-err_text-'].update('ОШИБКА! Введите целочисленный номер вычета', background_color='red')
+                window['-err_text-'].update('ОШИБКА! Введите целочисленный номер вычета', background_color='red', text_color='white', visible=True)
                 rec = 0
                 return 0, 0, 0
 
@@ -332,7 +377,7 @@ def MCC_create(VAL):
         if serv_resp.json()['response']['my-output1']['children'].startswith(' Good! '):
             data, shotn, rec = data_open(VAL)
             if int(shotn * rec):
-                draw_data(data, shotn, color_count, VAL)
+                draw_data(data, shotn, color_count)
             mcc_window.close()
         mcc_window['-no_mcc-'].update(serv_resp.json()['response']['children'])
         if event == sg.WIN_CLOSED:
@@ -351,7 +396,10 @@ while True:
     event, values = window.read()
     if event == 'Ok':
         color_count = 0
-        window['-err_text-'].update('', background_color=None)
+        active_list = []
+        for i in range(20):
+            window['%icheck' %i].update(False)
+        window['-err_text-'].update(visible=False)
         window['ReCalc'].update(visible=False)
         for ax in ch_ax:
             ax.cla()
@@ -363,27 +411,35 @@ while True:
         fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values)
         if int(shotn*rec):
-            draw_data(data, shotn, color_count, values)
+            draw_data(data, shotn, color_count)
+            history_list[shotn] = data
+            active_list.append(shotn)
+            window['%icheck' %history_ind].update(text='%i' %shotn, value=True, visible=True)
+            history_ind += 1
 
     if event == 'Append':
         color_count += 1
         if color_count == len(color_list):
             color_count = 0
-        window['-err_text-'].update('', background_color=None)
+        window['-err_text-'].update(visible=False)
         window['ReCalc'].update(visible=False)
         for ax in ch_ax:
             ax.cla()
         checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
         data, shotn, rec = data_open(values)
         if int(shotn * rec):
-            draw_data(data, shotn, color_count, values)
+            draw_data(data, shotn, color_count)
+            history_list[shotn] = data
+            active_list.append(shotn)
+            window['%icheck' % history_ind].update(text='%i' % shotn, value=True, visible=True)
+            history_ind += 1
 
     if event == 'Save':
         PATH_for_save = settings['path_out']
         window['ReCalc'].update(visible=False)
-        data = data['data']
         with open('%sjson/%i.json' %(PATH_for_save, shotn), 'w') as json_f:
-            json.dump({'compensation': rec, 'time': data['time'], 'data': data['data']}, json_f)
+            json.dump({'compensation': rec, 'time': data['data']['time'], 'data': data['data']['data'], 'shafr_int_meth': data['shafr_int_meth']}, json_f)
+        data = data['data']
         with open('%stxt/%i.txt' %(PATH_for_save, shotn), 'w') as txt_f:
             txt_f.write('%12s' %'time')
             for key in data['data']:
@@ -412,7 +468,8 @@ while True:
         packed = shtRipper.ripper.write(path=(PATH_for_save + 'sht/'), filename='%i.SHT' %shotn, data=to_pack)
         if len(packed) != 0:
             print('packed error = "%s"' % packed)
-        window['-err_text-'].update('Файлы сохранены в папку %s' %PATH_for_save, background_color='green')
+        window['-err_text-'].update('Файлы разряда %i сохранены в папку %s' %(shotn, PATH_for_save), background_color='green', text_color='white')
+        window['-err_text-'].update(visible=True)
 
     if event == 'Read Me':
         deffinition()
@@ -421,7 +478,7 @@ while True:
         set_page()
 
     if event == 'ReCalc':
-        window['-err_text-'].update('', background_color=None)
+        window['-err_text-'].update(visible=False)
         window['ReCalc'].update(visible=False)
         for ax in ch_ax:
             ax.cla()
@@ -433,13 +490,80 @@ while True:
         fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values, ReCalc=True)
         if int(shotn*rec):
-            draw_data(data, shotn, color_count, values)
+            draw_data(data, shotn, color_count)
+            history_list[shotn] = data
+            active_list.append(shotn)
+            window['%icheck' % history_ind].update(text='%i' % shotn, value=True, visible=True)
+            history_ind += 1
         #color_count = 0
 
     if event == '-SL_min- Release' or event == '-sl-max- Release':
-        print(values['-SL_min-'])
         axs[3,0].set_xlim((values['-SL_min-']/1e3), (values['-sl-max-']/1e3))
-        plot_right.draw()
+        '''for i in range(4):
+            for j in range(3):
+                axs[i,j].replot()'''
+        min_dict = {}
+        max_dict = {}
+        for key in history_list[active_list[0]]['data']['data'].keys():
+            for shot in active_list:
+                min_loc = min([history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if values['-sl-max-']/1e3 > t > values['-SL_min-']/1e3])
+                max_loc = max([history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if values['-sl-max-']/1e3 > t > values['-SL_min-']/1e3])
+                if key not in min_dict or min_dict[key] > min_loc:
+                    min_dict[key] = min_loc*0.9
+                if key not in max_dict or max_dict[key] < max_loc:
+                    max_dict[key] = max_loc*1.1
+        for shot in active_list:
+            min_loc = min([history_list[shot]['shafr_int_meth']['W'][i] for i, t in enumerate(history_list[shot]['shafr_int_meth']['time']) if values['-sl-max-'] > t > values['-SL_min-']])*0.9
+            max_loc = max([history_list[shot]['shafr_int_meth']['W'][i] for i, t in enumerate(history_list[shot]['shafr_int_meth']['time']) if values['-sl-max-'] > t > values['-SL_min-']])*1.1
+            if 'shafr_int_meth' not in min_dict or min_dict['shafr_int_meth'] > min_loc:
+                min_dict['shafr_int_meth'] = min_loc
+            if 'shafr_int_meth' not in max_dict or max_dict['shafr_int_meth'] < max_loc:
+                max_dict['shafr_int_meth'] = max_loc
+
+        axs[0, 0].set_ylim(min_dict['Bv'], max_dict['Bv'])
+        axs[1, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
+        axs[2, 0].set_ylim(min_dict['W_dia']/1000, max_dict['W_dia']/1000)
+        axs[3, 0].set_ylim(min_dict['shafr_int_meth']/1000, max_dict['shafr_int_meth']/1000)
+
+        axs[0, 1].set_ylim(min_dict['li'], max_dict['li'])
+        axs[1, 1].set_ylim(min_dict['Lp'], max_dict['Lp'])
+        axs[2, 1].set_ylim(min_dict['beta_t'], max_dict['beta_t'])
+        axs[3, 1].set_ylim(min_dict['beta_N'], max_dict['beta_N'])
+
+        axs[0, 2].set_ylim(min_dict['k'], max_dict['k'])
+        axs[1, 2].set_ylim((min_dict['tr_down']*int(min_dict['tr_down']<min_dict['tr_up']) + min_dict['tr_up']*int(min_dict['tr_down']>min_dict['tr_up'])),
+                           (max_dict['tr_down']*int(max_dict['tr_down']>max_dict['tr_up']) + max_dict['tr_up']*int(max_dict['tr_down']<max_dict['tr_up'])))
+        axs[2, 2].set_ylim(min_dict['Psi_av'], max_dict['Psi_av'])
+        axs[3, 2].set_ylim((min_dict['psiRes']*int(min_dict['psiRes']<min_dict['psiInd']) + min_dict['psiInd']*int(min_dict['psiRes']>min_dict['psiInd'])),
+                           (max_dict['psiRes']*int(max_dict['psiRes']>max_dict['psiInd']) + max_dict['psiInd']*int(max_dict['psiRes']<max_dict['psiInd'])))
+    plot_right.draw()
+
+    for i in range(20):
+        if event == '%icheck' %i:
+            if window['%icheck' %i].get():
+                shotn = int(window['%icheck' %i].Text)
+                active_list.append(shotn)
+                data = history_list[shotn]
+                color_count+=1
+                draw_data(data, shotn, color_count)
+            else:
+                shotn = window['%icheck' %i].Text
+                active_list.remove(int(shotn))
+                for ax in axs:
+                    for subax in ax:
+                        subax.cla()
+                        subax.grid()
+                fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+                if active_list:
+                    color_count = 0
+                    for shot in active_list:
+                        data = history_list[shot]
+                        draw_data(data, shot, color_count)
+                else:
+                    plot_right.draw()
+
+
+
 
 
     if event == sg.WIN_CLOSED: # if user closes window or clicks cancel
