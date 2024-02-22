@@ -17,44 +17,6 @@ def smooth(y, box_pts):
     return y_smooth
 
 
-'''def autoscale_y(axis,margin=0.1):
-    """This function rescales the y-axis based on the data that is visible given the current xlim of the axis.
-    ax -- a matplotlib axes object
-    margin -- the fraction of the total height of the y-data to pad the upper and lower ylims"""
-
-    def get_bottom_top(line):
-        xd = list(line.get_xdata())
-        yd = list(line.get_ydata())
-        lo,hi = axis.get_xlim()
-        #y_displayed = yd[((xd>lo) & (xd<hi))]
-        mini = 0
-        maxi = 0
-        for i, el in enumerate(xd):
-            if el >= lo:
-                mini = i
-            break
-        for i, el in enumerate(xd):
-            if el >= hi:
-                maxi = i
-            break
-        print(mini, maxi)
-        y_displayed = yd[mini:maxi]
-        h = max(y_displayed) - min(y_displayed)
-        bot = min(y_displayed)-margin*h
-        top = max(y_displayed)+margin*h
-        return bot,top
-
-    lines = axis.get_lines()
-    bot,top = np.inf, -np.inf
-
-    for line in lines:
-        new_bot, new_top = get_bottom_top(line)
-        if new_bot < bot: bot = new_bot
-        if new_top > top: top = new_top
-
-    axis.set_ylim(bot,top)'''
-
-
 plt.rcParams['axes.facecolor']='#E3F2FD'
 plt.rcParams['figure.facecolor']='#E3F2FD'
 px = 1/plt.rcParams['figure.dpi']
@@ -62,7 +24,7 @@ color_list = ['b', 'r', 'm', 'g', 'black']
 color_list2 = ['cyan', 'orange', 'pink', 'olive', 'gray']
 data_add = {'dimensions': {'Bt': 'T', 'beta_dia': '%', 'W_dia': 'J', 'li': '%',
                                             'dia_sig': 'mWb', 'Bv': 'T', 'Lp': 'nH', 'Psi_av': 'Wb', 'psiInd': 'Wb',
-                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%'}, 'error': None}
+                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%', 'Vp': 'm-3'}, 'error': None}
 
 #PATH_for_save_PUB = '//172.16.12.127/Pub/!diamagnetic_data'
 #PATH_for_save = 'c:/work/Data/diamagnetic_data/'
@@ -211,7 +173,7 @@ def check_page():
     #window_check.close()
 
 
-fig, axs = plt.subplots(4, 3, sharex=True, figsize=((screen_size[0]*px, screen_size[1]*0.8*px)))
+fig, axs = plt.subplots(4, 3, sharex=True, figsize=((14, 7)))
 plot_right = draw_figure(window['-plot2-'].TKCanvas, fig)
 make_canvas_interactive(plot_right)
 color_count = 0
@@ -219,6 +181,55 @@ color_count = 0
 active_list = []
 history_list = {}
 history_ind = 0
+
+def resize_fig(values):
+    min_dict = {}
+    max_dict = {}
+    for key in history_list[active_list[0]]['data']['data'].keys():
+        for shot in active_list:
+            min_loc = min(
+                [history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if
+                 values['-sl-max-'] / 1e3 > t > values['-SL_min-'] / 1e3])
+            max_loc = max(
+                [history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if
+                 values['-sl-max-'] / 1e3 > t > values['-SL_min-'] / 1e3])
+            if key not in min_dict or min_dict[key] > min_loc:
+                min_dict[key] = min_loc * 0.9
+            if key not in max_dict or max_dict[key] < max_loc:
+                max_dict[key] = max_loc * 1.1
+    for shot in active_list:
+        min_loc = min([history_list[shot]['shafr_int_meth']['W'][i] for i, t in
+                       enumerate(history_list[shot]['shafr_int_meth']['time']) if
+                       values['-sl-max-'] > t > values['-SL_min-']]) * 0.9
+        max_loc = max([history_list[shot]['shafr_int_meth']['W'][i] for i, t in
+                       enumerate(history_list[shot]['shafr_int_meth']['time']) if
+                       values['-sl-max-'] > t > values['-SL_min-']]) * 1.1
+        if 'shafr_int_meth' not in min_dict or min_dict['shafr_int_meth'] > min_loc:
+            min_dict['shafr_int_meth'] = min_loc
+        if 'shafr_int_meth' not in max_dict or max_dict['shafr_int_meth'] < max_loc:
+            max_dict['shafr_int_meth'] = max_loc
+
+    axs[0, 0].set_ylim(min_dict['Bv'], max_dict['Bv'])
+    axs[1, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
+    axs[2, 0].set_ylim(min_dict['W_dia'] / 1000, max_dict['W_dia'] / 1000)
+    axs[3, 0].set_ylim(min_dict['shafr_int_meth'] / 1000, max_dict['shafr_int_meth'] / 1000)
+
+    axs[0, 1].set_ylim(min_dict['li'], max_dict['li'])
+    axs[1, 1].set_ylim(min_dict['Vp'], max_dict['Vp'])
+    axs[2, 1].set_ylim(min_dict['beta_t'], max_dict['beta_t'])
+    axs[3, 1].set_ylim(min_dict['beta_N'], max_dict['beta_N'])
+
+    axs[0, 2].set_ylim(min_dict['k'], max_dict['k'])
+    axs[1, 2].set_ylim((min_dict['tr_down'] * int(min_dict['tr_down'] < min_dict['tr_up']) + min_dict['tr_up'] * int(
+        min_dict['tr_down'] > min_dict['tr_up'])),
+                       (max_dict['tr_down'] * int(max_dict['tr_down'] > max_dict['tr_up']) + max_dict['tr_up'] * int(
+                           max_dict['tr_down'] < max_dict['tr_up'])))
+    axs[2, 2].set_ylim(min_dict['Psi_av'], max_dict['Psi_av'])
+    axs[3, 2].set_ylim((min_dict['psiRes'] * int(min_dict['psiRes'] < min_dict['psiInd']) + min_dict['psiInd'] * int(
+        min_dict['psiRes'] > min_dict['psiInd'])),
+                       (max_dict['psiRes'] * int(max_dict['psiRes'] > max_dict['psiInd']) + max_dict['psiInd'] * int(
+                           max_dict['psiRes'] < max_dict['psiInd'])))
+
 def draw_data(data, shotn, color_count):
     if data['error'] == None:
         #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
@@ -228,7 +239,7 @@ def draw_data(data, shotn, color_count):
         axs[3, 0].plot([i/1000 for i in data['shafr_int_meth']['time']], [i/1000 for i in data['shafr_int_meth']['W']], label=shotn, color=color_list[color_count])
 
         axs[0, 1].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
-        axs[1, 1].plot(data['data']['time'], data['data']['data']['Lp'], label=shotn, color=color_list[color_count])
+        axs[1, 1].plot(data['data']['time'], data['data']['data']['Vp'], label=shotn, color=color_list[color_count])
         axs[2, 1].plot(data['data']['time'], data['data']['data']['beta_t'], label=shotn, color=color_list[color_count])
         axs[3, 1].plot(data['data']['time'], data['data']['data']['beta_N'], label=shotn, color=color_list[color_count])
 
@@ -269,7 +280,7 @@ def draw_data(data, shotn, color_count):
 
         axs[0, 1].set_ylabel(r'$l_{i}$')
         #axs[3, 0].set_ylim(0, 2)
-        axs[1, 1].set_ylabel(r'$L_{p}, nH$')
+        axs[1, 1].set_ylabel(r'$V_{p}, m^{-3}$')
         axs[0, 2].set_ylabel(r'$\kappa$')
         axs[1, 2].set_ylabel(r'$\delta$')
         axs[2, 2].set_ylabel(r'$\Psi, Wb$')
@@ -293,7 +304,7 @@ def draw_data(data, shotn, color_count):
         for ax in axs:
             ax_list.extend([subax for subax in ax])
         ax_tuple = tuple(ax_list)
-        cursor = MultiCursor(fig.canvas, ax_tuple, color='r', lw=0.5, horizOn=False, vertOn=True)
+        #cursor = MultiCursor(fig.canvas, ax_tuple, color='r', lw=0.5, horizOn=False, vertOn=True)
         plot_right.draw()
         window['-SL_min-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
         window['-sl-max-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
@@ -329,6 +340,8 @@ def data_open(values, ReCalc=False):
             data = {'data': {'time': data_new['time'], 'data': data_new['data'], 'dimensions': data_add['dimensions']},
                     'error': data_add['error'], 'shafr_int_meth': data_new['shafr_int_meth']}
             rec = data_new['compensation']
+            for key in data_add['dimensions'].keys():
+                ok_data = data_new['data'][key]
             window['-err_text-'].update('Данные загружены из базы данных (вычет: %i), если хотите пересчитать, введите номер вычета и нажмите ReCalc' %rec, background_color='green', text_color='white', visible=True)
             window['ReCalc'].update(visible=True)
         except:
@@ -493,6 +506,7 @@ while True:
             draw_data(data, shotn, color_count)
             history_list[shotn] = data
             active_list.append(shotn)
+            history_ind-=1
             window['%icheck' % history_ind].update(text='%i' % shotn, value=True, visible=True)
             history_ind += 1
         #color_count = 0
@@ -502,40 +516,7 @@ while True:
         '''for i in range(4):
             for j in range(3):
                 axs[i,j].replot()'''
-        min_dict = {}
-        max_dict = {}
-        for key in history_list[active_list[0]]['data']['data'].keys():
-            for shot in active_list:
-                min_loc = min([history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if values['-sl-max-']/1e3 > t > values['-SL_min-']/1e3])
-                max_loc = max([history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if values['-sl-max-']/1e3 > t > values['-SL_min-']/1e3])
-                if key not in min_dict or min_dict[key] > min_loc:
-                    min_dict[key] = min_loc*0.9
-                if key not in max_dict or max_dict[key] < max_loc:
-                    max_dict[key] = max_loc*1.1
-        for shot in active_list:
-            min_loc = min([history_list[shot]['shafr_int_meth']['W'][i] for i, t in enumerate(history_list[shot]['shafr_int_meth']['time']) if values['-sl-max-'] > t > values['-SL_min-']])*0.9
-            max_loc = max([history_list[shot]['shafr_int_meth']['W'][i] for i, t in enumerate(history_list[shot]['shafr_int_meth']['time']) if values['-sl-max-'] > t > values['-SL_min-']])*1.1
-            if 'shafr_int_meth' not in min_dict or min_dict['shafr_int_meth'] > min_loc:
-                min_dict['shafr_int_meth'] = min_loc
-            if 'shafr_int_meth' not in max_dict or max_dict['shafr_int_meth'] < max_loc:
-                max_dict['shafr_int_meth'] = max_loc
-
-        axs[0, 0].set_ylim(min_dict['Bv'], max_dict['Bv'])
-        axs[1, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
-        axs[2, 0].set_ylim(min_dict['W_dia']/1000, max_dict['W_dia']/1000)
-        axs[3, 0].set_ylim(min_dict['shafr_int_meth']/1000, max_dict['shafr_int_meth']/1000)
-
-        axs[0, 1].set_ylim(min_dict['li'], max_dict['li'])
-        axs[1, 1].set_ylim(min_dict['Lp'], max_dict['Lp'])
-        axs[2, 1].set_ylim(min_dict['beta_t'], max_dict['beta_t'])
-        axs[3, 1].set_ylim(min_dict['beta_N'], max_dict['beta_N'])
-
-        axs[0, 2].set_ylim(min_dict['k'], max_dict['k'])
-        axs[1, 2].set_ylim((min_dict['tr_down']*int(min_dict['tr_down']<min_dict['tr_up']) + min_dict['tr_up']*int(min_dict['tr_down']>min_dict['tr_up'])),
-                           (max_dict['tr_down']*int(max_dict['tr_down']>max_dict['tr_up']) + max_dict['tr_up']*int(max_dict['tr_down']<max_dict['tr_up'])))
-        axs[2, 2].set_ylim(min_dict['Psi_av'], max_dict['Psi_av'])
-        axs[3, 2].set_ylim((min_dict['psiRes']*int(min_dict['psiRes']<min_dict['psiInd']) + min_dict['psiInd']*int(min_dict['psiRes']>min_dict['psiInd'])),
-                           (max_dict['psiRes']*int(max_dict['psiRes']>max_dict['psiInd']) + max_dict['psiInd']*int(max_dict['psiRes']<max_dict['psiInd'])))
+        resize_fig(values)
     plot_right.draw()
 
     for i in range(20):
@@ -546,6 +527,7 @@ while True:
                 data = history_list[shotn]
                 color_count+=1
                 draw_data(data, shotn, color_count)
+                resize_fig(values)
             else:
                 shotn = window['%icheck' %i].Text
                 active_list.remove(int(shotn))
