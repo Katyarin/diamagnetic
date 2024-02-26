@@ -40,7 +40,7 @@ for i in range(20):
     list_of_checkbokes.append([sg.vtop(sg.Checkbox('', key='%icheck' %i, font=16, visible=False, enable_events=True))])
 layout = [  [sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
             [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
-            [sg.Button('Ok', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
+            [sg.Button('Ok', font=16), sg.Button('<ne>', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
             [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
             [sg.Column([[sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)], [sg.Slider(orientation='h', expand_x=True, key='-SL_min-'), sg.Slider(orientation='h', expand_x=True, key='-sl-max-', default_value=240)]], expand_x=True, expand_y=True),
              sg.vtop(sg.Column(list_of_checkbokes), expand_x=True, expand_y=True)],
@@ -200,10 +200,10 @@ def resize_fig(values):
     for shot in active_list:
         min_loc = min([history_list[shot]['shafr_int_meth']['W'][i] for i, t in
                        enumerate(history_list[shot]['shafr_int_meth']['time']) if
-                       values['-sl-max-'] > t > values['-SL_min-']]) * 0.9
+                       values['-sl-max-']/ 1e3 > t > values['-SL_min-']/ 1e3]) * 0.9
         max_loc = max([history_list[shot]['shafr_int_meth']['W'][i] for i, t in
                        enumerate(history_list[shot]['shafr_int_meth']['time']) if
-                       values['-sl-max-'] > t > values['-SL_min-']]) * 1.1
+                       values['-sl-max-']/ 1e3 > t > values['-SL_min-']/ 1e3]) * 1.1
         if 'shafr_int_meth' not in min_dict or min_dict['shafr_int_meth'] > min_loc:
             min_dict['shafr_int_meth'] = min_loc
         if 'shafr_int_meth' not in max_dict or max_dict['shafr_int_meth'] < max_loc:
@@ -211,10 +211,11 @@ def resize_fig(values):
 
     axs[0, 0].set_ylim(min_dict['Bv'], max_dict['Bv'])
     axs[1, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
-    axs[2, 0].set_ylim(min_dict['W_dia'] / 1000, max_dict['W_dia'] / 1000)
-    axs[3, 0].set_ylim(min_dict['shafr_int_meth'] / 1000, max_dict['shafr_int_meth'] / 1000)
+    print(max_dict['shafr_int_meth'])
+    axs[2, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
+    #axs[3, 0].set_ylim(min_dict['shafr_int_meth'] / 1000, max_dict['shafr_int_meth'] / 1000)
 
-    axs[0, 1].set_ylim(min_dict['li'], max_dict['li'])
+    axs[3, 0].set_ylim(min_dict['li'], max_dict['li'])
     axs[1, 1].set_ylim(min_dict['Vp'], max_dict['Vp'])
     axs[2, 1].set_ylim(min_dict['beta_t'], max_dict['beta_t'])
     axs[3, 1].set_ylim(min_dict['beta_N'], max_dict['beta_N'])
@@ -230,15 +231,64 @@ def resize_fig(values):
                        (max_dict['psiRes'] * int(max_dict['psiRes'] > max_dict['psiInd']) + max_dict['psiInd'] * int(
                            max_dict['psiRes'] < max_dict['psiInd'])))
 
+def av_ne(shotn):
+    TS_path = '//172.16.12.127/Pub/!!!TS_RESULTS/shots/%i/' %shotn
+    line_ind = 0
+    data_TS_dyn = {}
+    names_list = []
+    try:
+        with open(TS_path + '%i_dynamics.csv' %shotn, 'r') as dyn_file:
+            for line in dyn_file:
+                data_dyn_loc = line.split(sep=',')
+                if line_ind == 0:
+                    for el in data_dyn_loc:
+                        data_TS_dyn[el] = {'data': [], 'dimensions': []}
+                        names_list.append(el)
+
+                elif line_ind == 1:
+                    for i, el in enumerate(data_dyn_loc):
+                        data_TS_dyn[names_list[i]]['dimensions'] = el[1:]
+                else:
+                    for i, el in enumerate(data_dyn_loc):
+                        data_TS_dyn[names_list[i]]['data'].append(float(el))
+                line_ind += 1
+        axs[0, 1].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' <n>V']['data'], yerr=data_TS_dyn[' <n>V_err']['data'], label=r'$<n>_V$ %i'%shotn, color=color_list[color_count])
+        axs[0, 1].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' <n>42']['data'], yerr=data_TS_dyn[' <n>42_err']['data'], fmt='.', label=r'$<n>^{42}_l$ %i'%shotn, color=color_list[color_count])
+        axs[0, 1].legend()
+        plot_right.draw()
+        history_list[shotn]['TS_data'] = {'time': [i/1000 for i in data_TS_dyn[' time']['data']], '<n>V': data_TS_dyn[' <n>V']['data'],
+                           '<n>V_err': data_TS_dyn[' <n>V_err']['data'], '<n>42': data_TS_dyn[' <n>42']['data'], '<n>42_err': data_TS_dyn[' <n>42_err']['data']}
+        data['TS_data'] = history_list[shotn]['TS_data']
+        data['TS_data']['dimensions'] = {}
+        for key in data['TS_data'].keys():
+            if key != 'time' and key != 'dimensions':
+                data['TS_data']['dimensions'][key] = data_TS_dyn[' ' + key]['dimensions']
+
+    except Exception as error:
+        print(error)
+        window['-err_text-'].update('ОШИБКА!!! Нет файла с данными ТР. Попробуйте позже!', background_color='red', text_color='white',
+                                    visible=True)
+
+
 def draw_data(data, shotn, color_count):
     if data['error'] == None:
         #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
         axs[0, 0].plot(data['data']['time'], data['data']['data']['Bv'], '-', label='Bv %i' %shotn, color=color_list[color_count])
         axs[1, 0].plot(data['data']['time'], data['data']['data']['beta_dia'], label=shotn, color=color_list[color_count])
-        axs[2, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=shotn, color=color_list[color_count])
-        axs[3, 0].plot([i/1000 for i in data['shafr_int_meth']['time']], [i/1000 for i in data['shafr_int_meth']['W']], label=shotn, color=color_list[color_count])
+        axs[2, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=r'$W_{dia} $ %i' %shotn, color=color_list[color_count])
+        axs[2, 0].plot(data['shafr_int_meth']['time'], [i/1000 for i in data['shafr_int_meth']['W']], '--', label=r'$W_{shafr} $ %i' %shotn, color=color_list[color_count])
+        axs[3, 0].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
 
-        axs[0, 1].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
+        try:
+            axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>V'],
+                               yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
+                               color=color_list[color_count])
+            axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>42'],
+                               yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
+                               color=color_list[color_count])
+        except Exception as error:
+            print(error)
+            print('No TS data')
         axs[1, 1].plot(data['data']['time'], data['data']['data']['Vp'], label=shotn, color=color_list[color_count])
         axs[2, 1].plot(data['data']['time'], data['data']['data']['beta_t'], label=shotn, color=color_list[color_count])
         axs[3, 1].plot(data['data']['time'], data['data']['data']['beta_N'], label=shotn, color=color_list[color_count])
@@ -274,11 +324,11 @@ def draw_data(data, shotn, color_count):
         #axs[0, 0].set_ylim(0, 1)
         axs[1, 0].set_ylabel(r'$\beta_{dia}$')
         #axs[1, 0].set_ylim(0, 0.6)
-        axs[2, 0].set_ylabel(r'$W_{dia}, kJ$')
-        axs[3, 0].set_ylabel(r'$W_{shafr}, kJ$')
+        axs[2, 0].set_ylabel(r'$W, kJ$')
+        axs[3, 0].set_ylabel(r'$l_{i}$')
         #axs[2, 0].set_ylim(0, 20)
 
-        axs[0, 1].set_ylabel(r'$l_{i}$')
+        axs[0, 1].set_ylabel(r'$<n_{e}>_V, m^{-3}$')
         #axs[3, 0].set_ylim(0, 2)
         axs[1, 1].set_ylabel(r'$V_{p}, m^{-3}$')
         axs[0, 2].set_ylabel(r'$\kappa$')
@@ -295,7 +345,7 @@ def draw_data(data, shotn, color_count):
         count =0
         for ax in axs:
             for subax in ax:
-                subax.legend()
+                subax.legend(loc='upper left')
                 if count in [3, 4, 5, 9, 10, 11]:
                     #subax.yaxis.set_label_position("right")
                     subax.yaxis.tick_right()
@@ -332,19 +382,37 @@ def data_open(values, ReCalc=False):
         if rec * shotn:
             data = dia_sig.dia_data(shotn, rec, ch_ax)
             check_page()
+            history_list[shotn] = data
+        else:
+            return 0, 0, 0
     else:
         try:
             PATH_for_save = settings['path_out']
             with open('%sjson/%i.json' % (PATH_for_save, shotn), 'r') as json_f:
                 data_new = json.load(json_f)
-            data = {'data': {'time': data_new['time'], 'data': data_new['data'], 'dimensions': data_add['dimensions']},
-                    'error': data_add['error'], 'shafr_int_meth': data_new['shafr_int_meth']}
+            data = {'data': {}}
+            '''data = {'data': {'time': data_new['time'], 'data': data_new['data'], 'dimensions': data_add['dimensions']},
+                    'error': data_add['error'], 'shafr_int_meth': data_new['shafr_int_meth'], 'TS_data': data_new['TS_data']}'''
+            for key in data_new.keys():
+                if key == 'time' or key == 'data' or key == 'dimensions':
+                    data['data'][key] = data_new[key]
+                elif key!='compensation':
+                    data[key] = data_new[key]
+            if 'dimensions' not in list(data['data'].keys()):
+                data['data']['dimensions'] = data_add['dimensions']
+            if 'error' not in list(data['data'].keys()):
+                data['error'] = data_add['error']
+            if 'dimensions' not in list(data['shafr_int_meth'].keys()):
+                data['shafr_int_meth']['dimensions'] = {'W': 'J'}
             rec = data_new['compensation']
-            for key in data_add['dimensions'].keys():
-                ok_data = data_new['data'][key]
+            if 'shafr_int_meth' in list(data.keys()):
+                if max(data['shafr_int_meth']['time']) > 10:
+                    data['shafr_int_meth']['time'] = [i/1e3 for i in data['shafr_int_meth']['time']]
             window['-err_text-'].update('Данные загружены из базы данных (вычет: %i), если хотите пересчитать, введите номер вычета и нажмите ReCalc' %rec, background_color='green', text_color='white', visible=True)
             window['ReCalc'].update(visible=True)
-        except:
+            history_list[shotn] = data
+        except Exception as exep:
+            print(exep)
             try:
                 rec = int(values['-RECSHOT-'])
             except:
@@ -356,6 +424,10 @@ def data_open(values, ReCalc=False):
                 data = dia_sig.dia_data(shotn, rec, ch_ax)
                 check = check_page()
                 shotn = check*shotn
+                history_list[shotn] = data
+    if data:
+        if 'TS_data' not in list(data.keys()):
+            av_ne(shotn)
     return data, shotn, rec
 
 
@@ -425,7 +497,7 @@ while True:
         data, shotn, rec = data_open(values)
         if int(shotn*rec):
             draw_data(data, shotn, color_count)
-            history_list[shotn] = data
+
             active_list.append(shotn)
             window['%icheck' %history_ind].update(text='%i' %shotn, value=True, visible=True)
             history_ind += 1
@@ -448,41 +520,82 @@ while True:
             history_ind += 1
 
     if event == 'Save':
-        PATH_for_save = settings['path_out']
-        window['ReCalc'].update(visible=False)
-        with open('%sjson/%i.json' %(PATH_for_save, shotn), 'w') as json_f:
-            json.dump({'compensation': rec, 'time': data['data']['time'], 'data': data['data']['data'], 'shafr_int_meth': data['shafr_int_meth']}, json_f)
-        data = data['data']
-        with open('%stxt/%i.txt' %(PATH_for_save, shotn), 'w') as txt_f:
-            txt_f.write('%12s' %'time')
-            for key in data['data']:
-                txt_f.write('%12s' %key)
-            txt_f.write('\n')
-            txt_f.write('%12s' % 's')
-            for key in data['data']:
-                txt_f.write('%12s' % data['dimensions'][key])
-            txt_f.write('\n')
-            for i in range(len(data['time'])):
-                txt_f.write('%12.4f' %data['time'][i])
+        try:
+            PATH_for_save = settings['path_out']
+            window['ReCalc'].update(visible=False)
+            '''if 'TS_data' not in list(data.keys()):
+                data['TS_data'] = {}'''
+            for_dump = {}
+            for_dump['compensation'] = rec
+            for key in data.keys():
+                if key == 'data':
+                    for_dump['time'] = data['data']['time']
+                    for_dump['data'] = data['data']['data']
+                    for_dump['dimensions'] = data['data']['dimensions']
+                else:
+                    for_dump[key] = data[key]
+            with open('%sjson/%i.json' %(PATH_for_save, shotn), 'w') as json_f:
+                json.dump(for_dump, json_f)
+            to_pack = {}
+            for key in data.keys():
+                if key != 'data' and key !='TS_data' and key !='error':
+                    for key2 in data[key].keys():
+                        if key2 != 'time' and key2 != 'dimensions':
+                            to_pack[key + '_' + key2] = {
+                                'comment': 'data from %s' %key,
+                                'unit': '%s(%s)' % (key2, data[key]['dimensions'][key2]),
+                                'tMin': min(data[key]['time']),  # mininun time
+                                'tMax': max(data[key]['time']),  # maximum time
+                                'offset': 0.0,  # ADC zero level offset
+                                'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
+                                'y': data[key][key2]
+                            }
+                elif key =='TS_data':
+                    for key2 in data[key].keys():
+                        if 'err' not in key2 and key2 != 'time' and key2 != 'dimensions':
+                            to_pack[key2] = {
+                                'comment': 'data from %s' %key,
+                                'unit': '%s(%s)' % (key2, data[key]['dimensions'][key2]),
+                                'x': data[key]['time'],
+                                'y': data[key][key2],
+                                'err': data[key][key2 + '_err']
+                            }
+            data = data['data']
+            with open('%stxt/%i.txt' %(PATH_for_save, shotn), 'w') as txt_f:
+                txt_f.write('%12s' %'time')
                 for key in data['data']:
-                    txt_f.write('%12.4f' % data['data'][key][i])
+                    txt_f.write('%12s' %key)
                 txt_f.write('\n')
-        to_pack = {}
-        for key in data['data']:
-            to_pack[key] = {
-                'comment': '',
-                'unit': '%s(%s)' %(key, data['dimensions'][key]),
-                'tMin': min(data['time']),  # mininun time
-                'tMax': max(data['time']),  # maximum time
-                'offset': 0.0,  # ADC zero level offset
-                'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
-                'y': data['data'][key]
-            }
-        packed = shtRipper.ripper.write(path=(PATH_for_save + 'sht/'), filename='%i.SHT' %shotn, data=to_pack)
-        if len(packed) != 0:
-            print('packed error = "%s"' % packed)
-        window['-err_text-'].update('Файлы разряда %i сохранены в папку %s' %(shotn, PATH_for_save), background_color='green', text_color='white')
-        window['-err_text-'].update(visible=True)
+                txt_f.write('%12s' % 's')
+                for key in data['data']:
+                    txt_f.write('%12s' % data['dimensions'][key])
+                txt_f.write('\n')
+                for i in range(len(data['time'])):
+                    txt_f.write('%12.4f' %data['time'][i])
+                    for key in data['data']:
+                        txt_f.write('%12.4f' % data['data'][key][i])
+                    txt_f.write('\n')
+            for key in data['data']:
+                to_pack[key] = {
+                    'comment': '',
+                    'unit': '%s(%s)' %(key, data['dimensions'][key]),
+                    'tMin': min(data['time']),  # mininun time
+                    'tMax': max(data['time']),  # maximum time
+                    'offset': 0.0,  # ADC zero level offset
+                    'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
+                    'y': data['data'][key]
+                }
+            packed = shtRipper.ripper.write(path=(PATH_for_save + 'sht/'), filename='%i.SHT' %shotn, data=to_pack)
+            if len(packed) != 0:
+                print('packed error = "%s"' % packed)
+            window['-err_text-'].update('Файлы разряда %i сохранены в папку %s' %(shotn, PATH_for_save), background_color='green', text_color='white')
+            window['-err_text-'].update(visible=True)
+        except Exception as exep:
+            print(exep)
+            window['-err_text-'].update('Не удалось сохранить файлы. Пожалуйста, пересчитайте разряд и попробуйте снова (вычет: %i)' % (rec),
+                                        background_color='red', text_color='white')
+            window['-err_text-'].update(visible=True)
+            window['ReCalc'].update(visible=True)
 
     if event == 'Read Me':
         deffinition()
@@ -544,7 +657,15 @@ while True:
                 else:
                     plot_right.draw()
 
-
+    if event == '<ne>':
+        print('buut yes')
+        try:
+            shotn = int(values['-SHOT-'])
+        except:
+            window['-err_text-'].update('ОШИБКА! Введите целочисленный номер разряда', background_color='red',
+                                        text_color='white', visible=True)
+            shotn = 0
+        av_ne(shotn)
 
 
 

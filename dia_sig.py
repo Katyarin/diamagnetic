@@ -119,12 +119,12 @@ def dia_data(shot, recoupment, ax):
     #max_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(max([abs(i) for i in data_mcc['Psav']['variable']]))
     for i, el in enumerate([-i for i in data_mcc['Psav']['variable']]):
         time.append(data_mcc['time']['variable'][i])
-        '''if abs(el) > 10:
+        if abs(el) > 10:
             Bzav.append(data_mcc['lp']['variable'][i])
             Psav.append(-data_mcc['Bzav']['variable'][i] + data_mcc['Bzav']['variable'][0])
-        else:'''
-        Bzav.append(data_mcc['Bzav']['variable'][i])
-        Psav.append(el + data_mcc['Psav']['variable'][0])
+        else:
+            Bzav.append(data_mcc['Bzav']['variable'][i])
+            Psav.append(el + data_mcc['Psav']['variable'][0])
         r_c.append(data_mcc['current_coils']['r']['variable'][i])
         rb.append(data_mcc['boundary']['rbdy']['variable'][i])
         zb.append(data_mcc['boundary']['zbdy']['variable'][i])
@@ -189,5 +189,5 @@ def dia_data(shot, recoupment, ax):
                      'dimensions': {'Bt': 'T', 'beta_dia': '%', 'W_dia': 'J', 'li': '%',
                                             'dia_sig': 'mWb', 'Bv': 'T', 'Lp': 'nH', 'Psi_av': 'Wb', 'psiInd': 'Wb',
                                             'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%', 'Vp': 'm-3'}},
-            'shafr_int_meth': {'time': data_mcc['shafr_int_method']['time']['variable'], 'W': data_mcc['shafr_int_method']['w_eq']['variable']},
+            'shafr_int_meth': {'time': [i/1000 for i in data_mcc['shafr_int_method']['time']['variable']], 'W': data_mcc['shafr_int_method']['w_eq']['variable'], 'dimensions':{'W': 'J'}},
             'error': None}
