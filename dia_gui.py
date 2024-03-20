@@ -17,6 +17,7 @@ def smooth(y, box_pts):
     return y_smooth
 
 
+sg.set_options(font=16)
 plt.rcParams['axes.facecolor']='#E3F2FD'
 plt.rcParams['figure.facecolor']='#E3F2FD'
 px = 1/plt.rcParams['figure.dpi']
@@ -36,16 +37,40 @@ with open('settings.json', 'r') as set_file:
 
 sg.theme('Material1')
 list_of_checkbokes = [[sg.vtop(sg.Text('История', font=16))]]
+#list_of_checkbokes2 = [[sg.vtop(sg.Text('История', font=16))]]
 for i in range(20):
     list_of_checkbokes.append([sg.vtop(sg.Checkbox('', key='%icheck' %i, font=16, visible=False, enable_events=True))])
-layout = [  [sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
-            [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
-            [sg.Button('Ok', font=16), sg.Button('<ne>', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
-            [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
-            [sg.Column([[sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)], [sg.Slider(orientation='h', expand_x=True, key='-SL_min-'), sg.Slider(orientation='h', expand_x=True, key='-sl-max-', default_value=240)]], expand_x=True, expand_y=True),
-             sg.vtop(sg.Column(list_of_checkbokes), expand_x=True, expand_y=True)],
-            [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]]
+    #list_of_checkbokes2.append([sg.vtop(sg.Checkbox('', key='%icheck2' %i, font=16, visible=False, enable_events=True))])
+sl_min = sg.Slider(orientation='h', expand_x=True, key='-SL_min-')
+sl_max = sg.Slider(orientation='h', expand_x=True, key='-sl-max-', default_value=240)
+#sl_min2 = sg.Slider(orientation='h', expand_x=True, key='-SL_min2-')
+#sl_max2 = sg.Slider(orientation='h', expand_x=True, key='-sl-max2-', default_value=240)
+tab01 = [[sg.Canvas(key='-plot2-',expand_x=True, expand_y=True)]]
+tab02 = [[sg.Canvas(key='-plot3-',expand_x=True, expand_y=True)]]
+tab1 = [[sg.Column(tab01, expand_x=True, expand_y=True),
+             sg.vtop(sg.Column(list_of_checkbokes), expand_x=True, expand_y=True)]]
+#tab2 = [tab02]
+#tab2=[[sg.Text('Для расчета введите номер разряда и номер вычета', font=16)]]
 
+'''layout = [[sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
+          [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
+          [sg.Button('Ok', font=16), sg.Button('<ne>', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
+          [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
+          [sg.TabGroup([
+              [sg.Tab('Basic Info', tab01), sg.Tab('Contact Details', tab01)]])],
+          [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]
+          ]
+'''
+layout = [[sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
+          [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
+          [sg.Button('Ok', font=16), sg.Button('<ne>', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
+          [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
+          [sg.TabGroup([
+              [sg.Tab('General', tab1), sg.Tab('MCC', tab02)]], expand_x=True, expand_y=True)],
+          [sl_min, sl_max],
+          [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]
+
+]
 window = sg.Window('Расчет данных по диамагнитному сигналу', layout, resizable=True, finalize=True)
 
 screen_size = sg.Window.get_screen_size()
@@ -160,6 +185,9 @@ def check_page():
     checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
     make_canvas_interactive(plot_left)
     plot_left.draw()
+    main_window_x, main_window_y = window.current_location()
+    window_check.move(main_window_x+100, main_window_y+100)
+    window_check.location = (main_window_x+100, main_window_y+100)
 
 
     while True:
@@ -176,11 +204,18 @@ def check_page():
 fig, axs = plt.subplots(4, 3, sharex=True, figsize=((14, 7)))
 plot_right = draw_figure(window['-plot2-'].TKCanvas, fig)
 make_canvas_interactive(plot_right)
+
+fig3, axs3 = plt.subplots(4, 3, sharex=True, figsize=((14, 7)))
+plot3 = draw_figure(window['-plot3-'].TKCanvas, fig3)
+make_canvas_interactive(plot3)
 color_count = 0
+TS_plot = 1
 
 active_list = []
 history_list = {}
 history_ind = 0
+
+
 
 def resize_fig(values):
     min_dict = {}
@@ -209,19 +244,22 @@ def resize_fig(values):
         if 'shafr_int_meth' not in max_dict or max_dict['shafr_int_meth'] < max_loc:
             max_dict['shafr_int_meth'] = max_loc
 
-    axs[0, 0].set_ylim(min_dict['Bv'], max_dict['Bv'])
-    axs[1, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
+    axs3[1, 1].set_ylim(min_dict['Bv'], max_dict['Bv'])
+    axs[0, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
     print(max_dict['shafr_int_meth'])
     axs[2, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
+    axs[1, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
+    #axs[3, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
     #axs[3, 0].set_ylim(min_dict['shafr_int_meth'] / 1000, max_dict['shafr_int_meth'] / 1000)
 
-    axs[3, 0].set_ylim(min_dict['li'], max_dict['li'])
-    axs[1, 1].set_ylim(min_dict['Vp'], max_dict['Vp'])
+    axs[1, 1].set_ylim(min_dict['li'], max_dict['li'])
+    axs3[0, 0].set_ylim(min_dict['Vp'], max_dict['Vp'])
     axs[2, 1].set_ylim(min_dict['beta_t'], max_dict['beta_t'])
     axs[3, 1].set_ylim(min_dict['beta_N'], max_dict['beta_N'])
 
     axs[0, 2].set_ylim(min_dict['k'], max_dict['k'])
-    axs[1, 2].set_ylim((min_dict['tr_down'] * int(min_dict['tr_down'] < min_dict['tr_up']) + min_dict['tr_up'] * int(
+    axs[1, 2].set_ylim(min_dict['dEFC'], max_dict['dEFC'])
+    axs3[3, 0].set_ylim((min_dict['tr_down'] * int(min_dict['tr_down'] < min_dict['tr_up']) + min_dict['tr_up'] * int(
         min_dict['tr_down'] > min_dict['tr_up'])),
                        (max_dict['tr_down'] * int(max_dict['tr_down'] > max_dict['tr_up']) + max_dict['tr_up'] * int(
                            max_dict['tr_down'] < max_dict['tr_up'])))
@@ -230,6 +268,15 @@ def resize_fig(values):
         min_dict['psiRes'] > min_dict['psiInd'])),
                        (max_dict['psiRes'] * int(max_dict['psiRes'] > max_dict['psiInd']) + max_dict['psiInd'] * int(
                            max_dict['psiRes'] < max_dict['psiInd'])))
+
+    axs3[1, 0].set_ylim(min_dict['Sp'], max_dict['Sp'])
+    axs3[0, 1].set_ylim(min_dict['Bt'], max_dict['Bt'])
+    axs3[2, 1].set_ylim(min_dict['Rav'], max_dict['Rav'])
+    axs3[3, 1].set_ylim(min_dict['Zc'], max_dict['Zc'])
+    axs3[0, 2].set_ylim(min_dict['q'], max_dict['q'])
+    axs3[1, 2].set_ylim(min_dict['a'], max_dict['a'])
+    axs3[2, 2].set_ylim(min_dict['Rx'], max_dict['Rx'])
+    axs3[3, 2].set_ylim(min_dict['Zx'], max_dict['Zx'])
 
 def av_ne(shotn):
     TS_path = '//172.16.12.127/Pub/!!!TS_RESULTS/shots/%i/' %shotn
@@ -254,10 +301,23 @@ def av_ne(shotn):
                 line_ind += 1
         axs[0, 1].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' <n>V']['data'], yerr=data_TS_dyn[' <n>V_err']['data'], label=r'$<n>_V$ %i'%shotn, color=color_list[color_count])
         axs[0, 1].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' <n>42']['data'], yerr=data_TS_dyn[' <n>42_err']['data'], fmt='.', label=r'$<n>^{42}_l$ %i'%shotn, color=color_list[color_count])
+        axs[0, 2].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' T_center']['data'], yerr=data_TS_dyn[' T_c_err']['data'], fmt='.', label=r'$T_{center}$ %i'%shotn, color=color_list[color_count])
+        axs[3, 0].plot([i/1000 for i in data_TS_dyn[' time']['data']], [i / 1000 for i in data_TS_dyn[' We']['data']], label=r'$W_e$ %i'%shotn, color=color_list[color_count])
         axs[0, 1].legend()
+        axs[0, 2].legend()
+        axs[3, 0].legend()
+        axs[0, 1].grid()
+        axs[0, 2].grid()
+        axs[3, 0].grid()
+        TS_plot = 0
         plot_right.draw()
+        plot3.draw()
+        data_TS_dyn[' T_c'] = {}
+        data_TS_dyn[' T_c']['data'] = data_TS_dyn[' T_center']['data']
+        data_TS_dyn[' T_c']['dimensions'] = data_TS_dyn[' T_center']['dimensions']
         history_list[shotn]['TS_data'] = {'time': [i/1000 for i in data_TS_dyn[' time']['data']], '<n>V': data_TS_dyn[' <n>V']['data'],
-                           '<n>V_err': data_TS_dyn[' <n>V_err']['data'], '<n>42': data_TS_dyn[' <n>42']['data'], '<n>42_err': data_TS_dyn[' <n>42_err']['data']}
+                           '<n>V_err': data_TS_dyn[' <n>V_err']['data'], '<n>42': data_TS_dyn[' <n>42']['data'], '<n>42_err': data_TS_dyn[' <n>42_err']['data'],
+                                          'We': [i/1000 for i in data_TS_dyn[' We']['data']], 'T_c': data_TS_dyn[' T_center']['data'], 'T_c_err':  data_TS_dyn[' T_c_err']['data']}
         data['TS_data'] = history_list[shotn]['TS_data']
         data['TS_data']['dimensions'] = {}
         for key in data['TS_data'].keys():
@@ -265,105 +325,154 @@ def av_ne(shotn):
                 data['TS_data']['dimensions'][key] = data_TS_dyn[' ' + key]['dimensions']
 
     except Exception as error:
-        print(error)
-        window['-err_text-'].update('ОШИБКА!!! Нет файла с данными ТР. Попробуйте позже!', background_color='red', text_color='white',
+        TS_plot = 1
+        print('TS_err is:', error)
+        window['-err_text-'].update('ВНИМАНИЕ!!! Нет файла с данными ТР. Попробуйте позже или обратитесь к группе ТР', background_color='orange', text_color='white',
                                     visible=True)
 
 
-def draw_data(data, shotn, color_count):
-    if data['error'] == None:
-        #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
-        axs[0, 0].plot(data['data']['time'], data['data']['data']['Bv'], '-', label='Bv %i' %shotn, color=color_list[color_count])
-        axs[1, 0].plot(data['data']['time'], data['data']['data']['beta_dia'], label=shotn, color=color_list[color_count])
-        axs[2, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=r'$W_{dia} $ %i' %shotn, color=color_list[color_count])
-        axs[2, 0].plot(data['shafr_int_meth']['time'], [i/1000 for i in data['shafr_int_meth']['W']], '--', label=r'$W_{shafr} $ %i' %shotn, color=color_list[color_count])
-        axs[3, 0].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
+def draw_data(data, shotn, rec, color_count, TS_plot):
+    try:
+        if data['error'] == None:
+            #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
+            axs3[1, 1].plot(data['data']['time'], data['data']['data']['Bv'], '-', label='Bv %i' %shotn, color=color_list[color_count])
+            axs[0, 0].plot(data['data']['time'], data['data']['data']['beta_dia'], label=shotn, color=color_list[color_count])
+            axs[1, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=r'$W_{dia} $ %i' %shotn, color=color_list[color_count])
+            axs[2, 0].plot(data['shafr_int_meth']['time'], [i/1000 for i in data['shafr_int_meth']['W']], '--', label=r'$W_{shafr} $ %i' %shotn, color=color_list[color_count])
 
-        try:
-            axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>V'],
-                               yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
-                               color=color_list[color_count])
-            axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>42'],
-                               yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
-                               color=color_list[color_count])
-        except Exception as error:
-            print(error)
-            print('No TS data')
-        axs[1, 1].plot(data['data']['time'], data['data']['data']['Vp'], label=shotn, color=color_list[color_count])
-        axs[2, 1].plot(data['data']['time'], data['data']['data']['beta_t'], label=shotn, color=color_list[color_count])
-        axs[3, 1].plot(data['data']['time'], data['data']['data']['beta_N'], label=shotn, color=color_list[color_count])
+            axs[1, 1].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
 
-        '''psiAv = smooth([data['data']['data']['Psi_av'][1] - data['data']['data']['Psi_av'][0]]
-                       +[(data['data']['data']['Psi_av'][i+1] - data['data']['data']['Psi_av'][i-1])/2 for i in range(1, len(data['data']['data']['Psi_av'])-1)] +
-                       [data['data']['data']['Psi_av'][-1] - data['data']['data']['Psi_av'][-2]], 4)
-        axs[1, 1].plot(data['data']['time'], psiAv, label=r'$\Delta \Psi_{av}$ %i' %shotn)
+            try:
+                if TS_plot:
+                    axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>V'],
+                                       yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
+                                       color=color_list[color_count])
+                    axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>42'],
+                                       yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
+                                       color=color_list[color_count])
+                    axs[0, 2].errorbar(data['TS_data']['time'], data['TS_data']['T_c'],
+                                       yerr=data['TS_data']['T_c_err'], fmt='.', label=r'$T_{center}$ %i' % shotn,
+                                       color=color_list[color_count])
+                    axs[3, 0].plot(data['TS_data']['time'], data['TS_data']['We'], label=r'$W_e$ %i' % shotn,
+                                       color=color_list[color_count])
+                    axs[0, 1].legend()
+                    axs[0, 2].legend()
+                    axs[3, 0].legend()
+            except Exception as error:
+                TS_plot = 1
+                print(error)
+                axs[0, 1].cla()
+                axs[0, 2].cla()
+                axs[3, 0].cla()
+                axs[0, 1].grid()
+                axs[0, 2].grid()
+                axs[3, 0].grid()
+                print('No TS data')
 
-        psiInd = smooth([data['data']['data']['psiInd'][1] - data['data']['data']['psiInd'][0]]
-                       + [(data['data']['data']['psiInd'][i + 1] - data['data']['data']['psiInd'][i - 1]) / 2 for i in
-                          range(1, len(data['data']['data']['psiInd']) - 1)] +
-                       [data['data']['data']['psiInd'][-1] - data['data']['data']['psiInd'][-2]], 4)
-        axs[1, 1].plot(data['data']['time'], psiInd,
-                       label=r'$\Delta \Psi_{ind}$ %i' % shotn)'''
+            axs3[0, 0].plot(data['data']['time'], data['data']['data']['Vp'], label=shotn, color=color_list[color_count])
 
-        '''axs[1, 1].plot(data['data']['time'], [data['data']['data']['psiRes'][1] - data['data']['data']['psiRes'][0]]
-                       + [(data['data']['data']['psiRes'][i + 1] - data['data']['data']['psiRes'][i - 1]) / 2 for i in
-                          range(1, len(data['data']['data']['psiRes']) - 1)] +
-                       [data['data']['data']['psiRes'][-1] - data['data']['data']['psiRes'][-2]],
-                       label=r'$\Delta \Psi_{res}$ %i' % shotn)'''
+            axs[2, 1].plot(data['data']['time'], data['data']['data']['beta_t'], label=shotn, color=color_list[color_count])
+            axs[3, 1].plot(data['data']['time'], data['data']['data']['beta_N'], label=shotn, color=color_list[color_count])
 
-        axs[0, 2].plot(data['data']['time'], data['data']['data']['k'], label=shotn, color=color_list[color_count])
-        axs[1, 2].plot(data['data']['time'], data['data']['data']['tr_up'], label=r'$\delta_{up}$ %i' %shotn, color=color_list[color_count])
-        axs[1, 2].plot(data['data']['time'], data['data']['data']['tr_down'], '--', label=r'$\delta_{down}$ %i' %shotn, color=color_list[color_count])
-        axs[2, 2].plot(data['data']['time'], data['data']['data']['Psi_av'], '-', label=r'$\Psi_{av}$ %i' %shotn, color=color_list[color_count])
-        axs[3, 2].plot(data['data']['time'], data['data']['data']['psiInd'], '-', label=r'$\Delta\Psi_{ind}$ %i' %shotn, color=color_list[color_count])
-        axs[3, 2].plot(data['data']['time'], data['data']['data']['psiRes'], '--', label=r'$\Delta\Psi_{res}$ %i' %shotn, color=color_list[color_count])
+            #axs[0, 2].plot(data['data']['time'], data['data']['data']['k'], label=shotn, color=color_list[color_count])
+            axs3[2, 0].plot(data['data']['time'], data['data']['data']['k'], label=shotn, color=color_list[color_count])
+
+            axs3[3, 0].plot(data['data']['time'], data['data']['data']['tr_up'], label=r'$\delta_{up}$ %i' %shotn, color=color_list[color_count])
+            axs3[3, 0].plot(data['data']['time'], data['data']['data']['tr_down'], '--', label=r'$\delta_{down}$ %i' %shotn, color=color_list[color_count])
+
+            axs[1, 2].plot(data['data']['time'], data['data']['data']['dEFC'], label=r'$EFC_S - EFC_N $ %i' %shotn, color=color_list[color_count])
+            axs[2, 2].plot(data['data']['time'], data['data']['data']['Psi_av'], '-', label=r'$\Psi_{av}$ %i' %shotn, color=color_list[color_count])
+            axs[3, 2].plot(data['data']['time'], data['data']['data']['psiInd'], '-', label=r'$\Delta\Psi_{ind}$ %i' %shotn, color=color_list[color_count])
+            axs[3, 2].plot(data['data']['time'], data['data']['data']['psiRes'], '--', label=r'$\Delta\Psi_{res}$ %i' %shotn, color=color_list[color_count])
+
+            axs3[1, 0].plot(data['data']['time'], data['data']['data']['Sp'], label=r'$S_p$ %i' % shotn, color=color_list[color_count])
+            axs3[1, 0].set_ylabel(r'$S_p, m^2$')
+
+            axs3[0, 1].plot(data['data']['time'], data['data']['data']['Bt'], label=r'$B_T$ %i' % shotn, color=color_list[color_count])
+            axs3[0, 1].set_ylabel(r'$B, T$')
+            axs3[2, 1].plot(data['data']['time'], data['data']['data']['Rav'], label=r'$R_{av}$ %i' % shotn, color=color_list[color_count])
+            axs3[2, 1].set_ylabel(r'$R_{av}, m$')
+            axs3[3, 1].plot(data['data']['time'], data['data']['data']['Zc'], label=r'$Z_{central}$ %i' % shotn, color=color_list[color_count])
+            axs3[3, 1].set_ylabel(r'$Z_{central}, cm$')
+
+            axs3[0, 2].plot(data['data']['time'], data['data']['data']['q'], label=r'$q$ %i' % shotn, color=color_list[color_count])
+            axs3[0, 2].set_ylabel(r'$q$')
+            axs3[1, 2].plot(data['data']['time'], data['data']['data']['a'], label=r'$a$ %i' % shotn, color=color_list[color_count])
+            axs3[1, 2].set_ylabel(r'$a$, m')
+            axs3[2, 2].plot(data['data']['time'], data['data']['data']['Rx'], '.', label=r'$R_{x}$ %i' % shotn, color=color_list[color_count])
+            axs3[2, 2].set_ylabel(r'$R_{x}, cm$')
+            axs3[3, 2].plot(data['data']['time'], data['data']['data']['Zx'], '.', label=r'$Z_{x}$ %i' % shotn, color=color_list[color_count])
+            axs3[3, 2].set_ylabel(r'$Z_{x}, cm$')
 
 
-        axs[0, 0].set_ylabel(r'$B, T$')
-        #axs[0, 0].set_xlim(0.110, 0.3)
-        #axs[0, 0].set_ylim(0, 1)
-        axs[1, 0].set_ylabel(r'$\beta_{dia}$')
-        #axs[1, 0].set_ylim(0, 0.6)
-        axs[2, 0].set_ylabel(r'$W, kJ$')
-        axs[3, 0].set_ylabel(r'$l_{i}$')
-        #axs[2, 0].set_ylim(0, 20)
+            axs3[1, 1].set_ylabel(r'$B, T$')
+            #axs[0, 0].set_xlim(0.110, 0.3)
+            #axs[0, 0].set_ylim(0, 1)
+            axs[0, 0].set_ylabel(r'$\beta_{dia}$')
+            #axs[1, 0].set_ylim(0, 0.6)
+            axs[1, 0].set_ylabel(r'$W, kJ$')
+            axs[2, 0].set_ylabel(r'$W, kJ$')
+            axs[3, 0].set_ylabel(r'$W_e, kJ$')
+            axs[1, 1].set_ylabel(r'$l_{i}$')
+            #axs[2, 0].set_ylim(0, 20)
 
-        axs[0, 1].set_ylabel(r'$<n_{e}>_V, m^{-3}$')
-        #axs[3, 0].set_ylim(0, 2)
-        axs[1, 1].set_ylabel(r'$V_{p}, m^{-3}$')
-        axs[0, 2].set_ylabel(r'$\kappa$')
-        axs[1, 2].set_ylabel(r'$\delta$')
-        axs[2, 2].set_ylabel(r'$\Psi, Wb$')
-        axs[3, 2].set_ylabel(r'$\Delta\Psi, Wb$')
-        axs[2, 1].set_ylabel(r'$\beta_{T}, %$')
-        axs[3, 1].set_ylabel(r'$\beta_{N}, mm \cdot T / A$')
-        #axs[3, 0].set_ylim(0, 2)
-        axs[3, 0].set_xlabel('time, s')
-        axs[3, 1].set_xlabel('time, s')
-        axs[3, 2].set_xlabel('time, s')
+            axs[0, 1].set_ylabel(r'$<n_{e}>_V, m^{-3}$')
+            #axs[3, 0].set_ylim(0, 2)
+            axs3[0, 0].set_ylabel(r'$V_{p}, m^{3}$')
+            axs[0, 2].set_ylabel(r'$T_{center}$, eV')
+            axs3[2, 0].set_ylabel(r'$\kappa$')
+            axs3[3, 0].set_ylabel(r'$\delta$')
+            axs[1, 2].set_ylabel(r'$EFC_S - EFC_N$')
+            axs[2, 2].set_ylabel(r'$\Psi, Wb$')
+            axs[3, 2].set_ylabel(r'$\Delta\Psi, Wb$')
+            axs[2, 1].set_ylabel(r'$\beta_{T}, %$')
+            axs[3, 1].set_ylabel(r'$\beta_{N}, mm \cdot T / A$')
+            #axs[3, 0].set_ylim(0, 2)
+            axs[3, 0].set_xlabel('time, s')
+            axs[3, 1].set_xlabel('time, s')
+            axs[3, 2].set_xlabel('time, s')
 
-        count =0
-        for ax in axs:
-            for subax in ax:
-                subax.legend(loc='upper left')
-                if count in [3, 4, 5, 9, 10, 11]:
-                    #subax.yaxis.set_label_position("right")
-                    subax.yaxis.tick_right()
-                count+=1
-        ax_list = []
-        for ax in axs:
-            ax_list.extend([subax for subax in ax])
-        ax_tuple = tuple(ax_list)
-        #cursor = MultiCursor(fig.canvas, ax_tuple, color='r', lw=0.5, horizOn=False, vertOn=True)
-        plot_right.draw()
-        window['-SL_min-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
-        window['-sl-max-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
-        window['-sl-max-'].update(value=(max(data['data']['time'])*1e3))
-        window['-SL_min-'].update(value=(min(data['data']['time'])*1e3))
-        '''elif data['error'] == "MCC file does not exist":
-        MCC_create(VAL)'''
-    else:
-        window['-err_text-'].update('ОШИБКА!!! %s' %data['error'], background_color='red', text_color='white', visible=True)
+            axs3[3, 0].set_xlabel('time, s')
+            axs3[3, 1].set_xlabel('time, s')
+            axs3[3, 2].set_xlabel('time, s')
+
+            count =0
+            for ax in axs:
+                for subax in ax:
+                    subax.legend(loc='upper left')
+                    if count in [3, 4, 5, 9, 10, 11]:
+                        #subax.yaxis.set_label_position("right")
+                        subax.yaxis.tick_right()
+                    count+=1
+
+            count = 0
+            for ax in axs3:
+                for subax in ax:
+                    subax.legend(loc='upper left')
+                    if count in [3, 4, 5, 9, 10, 11]:
+                        #subax.yaxis.set_label_position("right")
+                        subax.yaxis.tick_right()
+                    count+=1
+            ax_list = []
+            for ax in axs:
+                ax_list.extend([subax for subax in ax])
+            ax_tuple = tuple(ax_list)
+            #cursor = MultiCursor(fig.canvas, ax_tuple, color='r', lw=0.5, horizOn=False, vertOn=True)
+            plot_right.draw()
+            plot3.draw()
+            window['-SL_min-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
+            window['-sl-max-'].update(range=((min(data['data']['time'])*1e3), (max(data['data']['time']))*1e3))
+            window['-sl-max-'].update(value=(max(data['data']['time'])*1e3))
+            window['-SL_min-'].update(value=(min(data['data']['time'])*1e3))
+            '''elif data['error'] == "MCC file does not exist":
+            MCC_create(VAL)'''
+        else:
+            window['-err_text-'].update('ОШИБКА!!! %s' %data['error'], background_color='red', text_color='white', visible=True)
+    except Exception as exep:
+        print(exep)
+        window['-err_text-'].update('ОШИБКА!!! Введите номер вычета %i и нажмите ReCalc ' %rec, background_color='red', text_color='white',
+                                    visible=True)
+        window['ReCalc'].update(visible=True)
 
 
 def data_open(values, ReCalc=False):
@@ -462,7 +571,7 @@ def MCC_create(VAL):
         if serv_resp.json()['response']['my-output1']['children'].startswith(' Good! '):
             data, shotn, rec = data_open(VAL)
             if int(shotn * rec):
-                draw_data(data, shotn, color_count)
+                draw_data(data, shotn, rec, color_count, TS_plot)
             mcc_window.close()
         mcc_window['-no_mcc-'].update(serv_resp.json()['response']['children'])
         if event == sg.WIN_CLOSED:
@@ -484,6 +593,7 @@ while True:
         active_list = []
         for i in range(20):
             window['%icheck' %i].update(False)
+           # window['%icheck2' %i].update(False)
         window['-err_text-'].update(visible=False)
         window['ReCalc'].update(visible=False)
         for ax in ch_ax:
@@ -493,13 +603,19 @@ while True:
             for subax in ax:
                 subax.clear()
                 subax.grid()
+        for ax in axs3:
+            for subax in ax:
+                subax.clear()
+                subax.grid()
         fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values)
         if int(shotn*rec):
-            draw_data(data, shotn, color_count)
+            draw_data(data, shotn, rec, color_count, TS_plot)
 
             active_list.append(shotn)
             window['%icheck' %history_ind].update(text='%i' %shotn, value=True, visible=True)
+            #window['%icheck2' %history_ind].update(text='%i' %shotn, value=True, visible=True)
             history_ind += 1
 
     if event == 'Append':
@@ -513,10 +629,11 @@ while True:
         checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
         data, shotn, rec = data_open(values)
         if int(shotn * rec):
-            draw_data(data, shotn, color_count)
+            draw_data(data, shotn, rec, color_count, TS_plot)
             history_list[shotn] = data
             active_list.append(shotn)
             window['%icheck' % history_ind].update(text='%i' % shotn, value=True, visible=True)
+            #window['%icheck2' % history_ind].update(text='%i' % shotn, value=True, visible=True)
             history_ind += 1
 
     if event == 'Save':
@@ -552,13 +669,23 @@ while True:
                             }
                 elif key =='TS_data':
                     for key2 in data[key].keys():
-                        if 'err' not in key2 and key2 != 'time' and key2 != 'dimensions':
+                        if 'err' not in key2 and key2 != 'time' and key2 != 'dimensions' and key2 != 'We':
                             to_pack[key2] = {
                                 'comment': 'data from %s' %key,
                                 'unit': '%s(%s)' % (key2, data[key]['dimensions'][key2]),
                                 'x': data[key]['time'],
                                 'y': data[key][key2],
                                 'err': data[key][key2 + '_err']
+                            }
+                        if key2 == 'We':
+                            to_pack[key2] = {
+                                'comment': 'data from %s' %key,
+                                'unit': '%s(%s)' % (key, data[key]['dimensions'][key2]),
+                                'tMin': min(data[key]['time']),  # mininun time
+                                'tMax': max(data[key]['time']),  # maximum time
+                                'offset': 0.0,  # ADC zero level offset
+                                'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
+                                'y': data[key][key2]
                             }
             data = data['data']
             with open('%stxt/%i.txt' %(PATH_for_save, shotn), 'w') as txt_f:
@@ -606,6 +733,8 @@ while True:
     if event == 'ReCalc':
         window['-err_text-'].update(visible=False)
         window['ReCalc'].update(visible=False)
+        history_list[shotn] = {}
+        active_list.remove(shotn)
         for ax in ch_ax:
             ax.cla()
         checked_fig.subplots_adjust(left=0.062, bottom=0.26, right=0.95, top=0.843, wspace=0.126, hspace=0)
@@ -613,49 +742,69 @@ while True:
             for subax in ax:
                 subax.clear()
                 subax.grid()
+        for ax in axs3:
+            for subax in ax:
+                subax.clear()
+                subax.grid()
         fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values, ReCalc=True)
         if int(shotn*rec):
-            draw_data(data, shotn, color_count)
+            TS_plot = 0
+            draw_data(data, shotn, rec, color_count, TS_plot)
             history_list[shotn] = data
             active_list.append(shotn)
             history_ind-=1
             window['%icheck' % history_ind].update(text='%i' % shotn, value=True, visible=True)
+           # window['%icheck2' % history_ind].update(text='%i' % shotn, value=True, visible=True)
             history_ind += 1
         #color_count = 0
 
     if event == '-SL_min- Release' or event == '-sl-max- Release':
         axs[3,0].set_xlim((values['-SL_min-']/1e3), (values['-sl-max-']/1e3))
+        axs3[3,0].set_xlim((values['-SL_min-']/1e3), (values['-sl-max-']/1e3))
         '''for i in range(4):
             for j in range(3):
                 axs[i,j].replot()'''
         resize_fig(values)
     plot_right.draw()
+    plot3.draw()
 
     for i in range(20):
         if event == '%icheck' %i:
             if window['%icheck' %i].get():
+                #window['%icheck2' % i].update(True)
                 shotn = int(window['%icheck' %i].Text)
                 active_list.append(shotn)
                 data = history_list[shotn]
                 color_count+=1
-                draw_data(data, shotn, color_count)
+                TS_plot = 1
+                draw_data(data, shotn, 0, color_count, TS_plot)
                 resize_fig(values)
             else:
+                #window['%icheck2' % i].update(False)
                 shotn = window['%icheck' %i].Text
                 active_list.remove(int(shotn))
                 for ax in axs:
                     for subax in ax:
                         subax.cla()
                         subax.grid()
+                for ax in axs3:
+                    for subax in ax:
+                        subax.cla()
+                        subax.grid()
                 fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+                fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
                 if active_list:
                     color_count = 0
                     for shot in active_list:
                         data = history_list[shot]
-                        draw_data(data, shot, color_count)
+                        draw_data(data, shot, 0, color_count, TS_plot)
                 else:
+                    color_count = 0
                     plot_right.draw()
+                    plot3.draw()
+
 
     if event == '<ne>':
         print('buut yes')

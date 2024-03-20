@@ -38,13 +38,17 @@ def get_sht_data(Shotn, data_name):
     res = shtRipper.ripper.read(filename, data_name)
     if 'err' in list(res.keys()):
         filename = settings['path_in_new'] % Shotn
-        res = shtRipper.ripper.read(filename, data_name)
+        try:
+            res = shtRipper.ripper.read(filename, data_name)
+        except Exception as error:
+            print('sht new file error: ', error)
+            return {'err': error}
 
     if 'err' in list(res.keys()):
         return {'err': res['err']}
     smooth_res = {}
     for key in res.keys():
-        if key != 'nl 42 cm (1.5мм) 64pi':
+        if key != 'nl 42 cm (1.5мм) 64pi' and key != 'Itf (2TF)(инт.23)':
             baseline = sum(res[key]['y'][:1000]) / len(res[key]['y'][:1000])
             res[key]['y'] = [i - baseline for i in res[key]['y']]
         smooth_res[key] = {}
@@ -61,7 +65,7 @@ def get_sht_data(Shotn, data_name):
 def dia_data(shot, recoupment, ax):
 
     data_name_need = ['Ip внутр.(Пр2ВК) (инт.18)', 'Itf (2TF)(инт.23)', 'Диамагнитный сигнал (новый инт.)', 'Ics (4CS) (инт.22)',
-                  'Up (внутреннее 175 петля)', 'Программа тока Ip']
+                  'Up (внутреннее 175 петля)', 'Программа тока Ip', 'EFC S (инт. 35)', 'EFC N (инт. 27)']
 
 
     data = get_sht_data(shot, data_name_need)
@@ -90,7 +94,9 @@ def dia_data(shot, recoupment, ax):
     dia_sig2 = [
         recoupment_data['Диамагнитный сигнал (новый инт.)']['data'][i] + recoupment_data['Ics (4CS) (инт.22)']['data'][
             i] * 8e-6 for i in range(len(data['Ics (4CS) (инт.22)']['data']))]
-
+    #print(len(data['EFC S (инт. 35)']['data']), len(data['EFC N (инт. 27)']['data']))
+    delta_efc = [data['EFC S (инт. 35)']['data'][i] - data['EFC N (инт. 27)']['data'][i] for i in
+                 range(len(data['EFC N (инт. 27)']['data']))]
     diamagnetic_sig = {'time': data['Диамагнитный сигнал (новый инт.)']['time'],
                        'data': [(dia_sig1[i] - dia_sig2[i]) * 2.915 for i in range(len(dia_sig1))]}
 
@@ -115,6 +121,11 @@ def dia_data(shot, recoupment, ax):
     I_c = []
     Psav = []
     Vp = []
+
+    Sp = []
+    q = []
+    Rx = []
+    Zx = []
     #min_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(min([abs(i) for i in data_mcc['Psav']['variable']]))
     #max_ind = [abs(i) for i in data_mcc['Psav']['variable']].index(max([abs(i) for i in data_mcc['Psav']['variable']]))
     for i, el in enumerate([-i for i in data_mcc['Psav']['variable']]):
@@ -131,6 +142,11 @@ def dia_data(shot, recoupment, ax):
         Ip.append(data_mcc['Ipl']['variable'][i])
         I_c.append(data_mcc['current_coils']['I']['variable'][i])
         Vp.append(data_mcc['Vp']['variable'][i])
+        Sp.append(data_mcc['Sp']['variable'][i])
+        Rx.append(data_mcc['Rx']['variable'][i])
+        Zx.append(data_mcc['Zx']['variable'][i])
+        q.append(data_mcc['q']['variable'][i])
+
 
     Rav = [sum([r_c[index_time][i] * I_c[index_time][i] for i in range(len(r_c[index_time]))]) / Ip[index_time] / 100 for index_time in range(len(time))]
 
@@ -141,6 +157,8 @@ def dia_data(shot, recoupment, ax):
     tr_up = [(Rav[i] - rb[i][zb[i].index(max(zb[i]))]/100)/a[i] for i in range(len(time))]
 
     tr_down = [(Rav[i] - rb[i][zb[i].index(min(zb[i]))]/100)/a[i] for i in range(len(time))]
+
+    Zc = [(max(zb[index_time][1:]) + min(zb[index_time])) / 2 for index_time in range(len(time))]
 
     Bt_list = []
     beta_dia_list = []
@@ -153,11 +171,13 @@ def dia_data(shot, recoupment, ax):
     psi_res_list = []
     psi_ind_list = []
     Ipl_list = []
+    dEFC = []
     for j, p in enumerate(time):
         Itf = average_1ms(diamagnetic_sig['time'], data['Itf (2TF)(инт.23)']['data'], p)
         Bt = 0.2 * 16 * Itf / 1e6 / Rav[j]
         Bt_list.append(Bt)
         dia = average_1ms(diamagnetic_sig['time'], diamagnetic_sig['data'], p)
+        dEFC.append(average_1ms(data['EFC N (инт. 27)']['time'], delta_efc, p))
         dia_sig_mcc.append(dia)
         Ipl = average_1ms(diamagnetic_sig['time'], Ip_all, p)
         Ipl_list.append(Ipl)
@@ -185,9 +205,11 @@ def dia_data(shot, recoupment, ax):
     psi_res_list = [i+psi_ind_min for i in psi_res_list]
     return {'data': {'time': time, 'data': {'Bt': Bt_list, 'beta_dia': beta_dia_list, 'W_dia': W_dia_list, 'li': li_list,
                                             'dia_sig': dia_sig_mcc, 'Bv': [abs(i*1e-4) for i in Bzav], 'Lp': [i*1e9 for i in Li_list], 'Psi_av': Psav, 'psiInd': psi_ind_list,
-                                            'psiRes': psi_res_list, 'beta_t': beta_t_list, 'beta_N': beta_N_list, 'Ipl': Ipl_list, 'Rav': Rav, 'k': k, 'tr_up': tr_up, 'tr_down': tr_down, 'Vp':Vp},
+                                            'psiRes': psi_res_list, 'beta_t': beta_t_list, 'beta_N': beta_N_list, 'Ipl': Ipl_list, 'Rav': Rav, 'k': k, 'tr_up': tr_up, 'tr_down': tr_down, 'Vp':Vp,
+                                            'Sp': Sp, 'a': a, 'Zc': Zc, 'q': q, 'Rx': Rx, 'Zx': Zx, 'dEFC': dEFC},
                      'dimensions': {'Bt': 'T', 'beta_dia': '%', 'W_dia': 'J', 'li': '%',
                                             'dia_sig': 'mWb', 'Bv': 'T', 'Lp': 'nH', 'Psi_av': 'Wb', 'psiInd': 'Wb',
-                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%', 'Vp': 'm-3'}},
+                                            'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'mm*T/A', 'Ipl': 'A', 'Rav': 'm', 'k': '%', 'tr_up': '%', 'tr_down': '%', 'Vp': 'm-3',
+                                    'Sp': 'm^2', 'a': 'm', 'Zc': 'cm', 'q': 'a.u.', 'Rx': 'cm', 'Zx': 'cm', 'dEFC': 'V*s'}},
             'shafr_int_meth': {'time': [i/1000 for i in data_mcc['shafr_int_method']['time']['variable']], 'W': data_mcc['shafr_int_method']['w_eq']['variable'], 'dimensions':{'W': 'J'}},
             'error': None}
