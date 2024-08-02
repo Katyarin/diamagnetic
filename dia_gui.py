@@ -222,16 +222,23 @@ def resize_fig(values):
     max_dict = {}
     for key in history_list[active_list[0]]['data']['data'].keys():
         for shot in active_list:
-            min_loc = min(
-                [history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if
-                 values['-sl-max-'] / 1e3 > t > values['-SL_min-'] / 1e3])
-            max_loc = max(
-                [history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if
-                 values['-sl-max-'] / 1e3 > t > values['-SL_min-'] / 1e3])
-            if key not in min_dict or min_dict[key] > min_loc:
-                min_dict[key] = min_loc * 0.9
-            if key not in max_dict or max_dict[key] < max_loc:
-                max_dict[key] = max_loc * 1.1
+            if history_list[shot]['data']['data'][key]:
+                min_loc = min(
+                    [history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if
+                     values['-sl-max-'] / 1e3 > t > values['-SL_min-'] / 1e3])
+                max_loc = max(
+                    [history_list[shot]['data']['data'][key][i] for i, t in enumerate(history_list[shot]['data']['time']) if
+                     values['-sl-max-'] / 1e3 > t > values['-SL_min-'] / 1e3])
+                if key not in min_dict or abs(min_dict[key]) > abs(min_loc):
+                    if min_loc > 0:
+                        min_dict[key] = min_loc * 0.9
+                    else:
+                        min_dict[key] = min_loc * 1.1
+                if key not in max_dict or abs(max_dict[key]) < abs(max_loc):
+                    if max_loc > 0:
+                        max_dict[key] = max_loc * 1.1
+                    else:
+                        max_dict[key] = max_loc * 0.9
     for shot in active_list:
         min_loc = min([history_list[shot]['shafr_int_meth']['W'][i] for i, t in
                        enumerate(history_list[shot]['shafr_int_meth']['time']) if
@@ -248,7 +255,7 @@ def resize_fig(values):
     axs[0, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
     print(max_dict['shafr_int_meth'])
     axs[2, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
-    axs[1, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
+    axs[1, 0].set_ylim(min_dict['W_dia']/1e3, max_dict['W_dia']/1e3)
     #axs[3, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
     #axs[3, 0].set_ylim(min_dict['shafr_int_meth'] / 1000, max_dict['shafr_int_meth'] / 1000)
 
@@ -257,8 +264,8 @@ def resize_fig(values):
     axs[2, 1].set_ylim(min_dict['beta_t'], max_dict['beta_t'])
     axs[3, 1].set_ylim(min_dict['beta_N'], max_dict['beta_N'])
 
-    axs[0, 2].set_ylim(min_dict['k'], max_dict['k'])
-    axs[1, 2].set_ylim(min_dict['dEFC'], max_dict['dEFC'])
+    #axs[0, 2].set_ylim(min_dict['k'], max_dict['k'])
+    axs[1, 2].set_ylim(min_dict['dEFC']*0.9, max_dict['dEFC'])
     axs3[3, 0].set_ylim((min_dict['tr_down'] * int(min_dict['tr_down'] < min_dict['tr_up']) + min_dict['tr_up'] * int(
         min_dict['tr_down'] > min_dict['tr_up'])),
                        (max_dict['tr_down'] * int(max_dict['tr_down'] > max_dict['tr_up']) + max_dict['tr_up'] * int(
@@ -273,7 +280,7 @@ def resize_fig(values):
     axs3[0, 1].set_ylim(min_dict['Bt'], max_dict['Bt'])
     axs3[2, 1].set_ylim(min_dict['Rav'], max_dict['Rav'])
     axs3[3, 1].set_ylim(min_dict['Zc'], max_dict['Zc'])
-    axs3[0, 2].set_ylim(min_dict['q'], max_dict['q'])
+    axs3[0, 2].set_ylim(min_dict['Zav'], max_dict['Zav'])
     axs3[1, 2].set_ylim(min_dict['a'], max_dict['a'])
     axs3[2, 2].set_ylim(min_dict['Rx'], max_dict['Rx'])
     axs3[3, 2].set_ylim(min_dict['Zx'], max_dict['Zx'])
@@ -299,25 +306,12 @@ def av_ne(shotn):
                     for i, el in enumerate(data_dyn_loc):
                         data_TS_dyn[names_list[i]]['data'].append(float(el))
                 line_ind += 1
-        axs[0, 1].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' <n>V']['data'], yerr=data_TS_dyn[' <n>V_err']['data'], label=r'$<n>_V$ %i'%shotn, color=color_list[color_count])
-        axs[0, 1].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' <n>42']['data'], yerr=data_TS_dyn[' <n>42_err']['data'], fmt='.', label=r'$<n>^{42}_l$ %i'%shotn, color=color_list[color_count])
-        axs[0, 2].errorbar([i/1000 for i in data_TS_dyn[' time']['data']], data_TS_dyn[' T_center']['data'], yerr=data_TS_dyn[' T_c_err']['data'], fmt='.', label=r'$T_{center}$ %i'%shotn, color=color_list[color_count])
-        axs[3, 0].plot([i/1000 for i in data_TS_dyn[' time']['data']], [i / 1000 for i in data_TS_dyn[' We']['data']], label=r'$W_e$ %i'%shotn, color=color_list[color_count])
-        axs[0, 1].legend()
-        axs[0, 2].legend()
-        axs[3, 0].legend()
-        axs[0, 1].grid()
-        axs[0, 2].grid()
-        axs[3, 0].grid()
-        TS_plot = 0
-        plot_right.draw()
-        plot3.draw()
-        data_TS_dyn[' T_c'] = {}
-        data_TS_dyn[' T_c']['data'] = data_TS_dyn[' T_center']['data']
-        data_TS_dyn[' T_c']['dimensions'] = data_TS_dyn[' T_center']['dimensions']
+        data_TS_dyn[' T_max'] = {}
+        data_TS_dyn[' T_max']['data'] = data_TS_dyn[' T_max_measured']['data']
+        data_TS_dyn[' T_max']['dimensions'] = data_TS_dyn[' T_max_measured']['dimensions']
         history_list[shotn]['TS_data'] = {'time': [i/1000 for i in data_TS_dyn[' time']['data']], '<n>V': data_TS_dyn[' <n>V']['data'],
                            '<n>V_err': data_TS_dyn[' <n>V_err']['data'], '<n>42': data_TS_dyn[' <n>42']['data'], '<n>42_err': data_TS_dyn[' <n>42_err']['data'],
-                                          'We': [i/1000 for i in data_TS_dyn[' We']['data']], 'T_c': data_TS_dyn[' T_center']['data'], 'T_c_err':  data_TS_dyn[' T_c_err']['data']}
+                                          'We': [i/1000 for i in data_TS_dyn[' We']['data']], 'T_max': data_TS_dyn[' T_max']['data'], 'T_max_err':  data_TS_dyn[' T_max_err']['data']}
         data['TS_data'] = history_list[shotn]['TS_data']
         data['TS_data']['dimensions'] = {}
         for key in data['TS_data'].keys():
@@ -343,30 +337,28 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             axs[1, 1].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
 
             try:
-                if TS_plot:
-                    axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>V'],
-                                       yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
-                                       color=color_list[color_count])
-                    axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>42'],
-                                       yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
-                                       color=color_list[color_count])
-                    axs[0, 2].errorbar(data['TS_data']['time'], data['TS_data']['T_c'],
-                                       yerr=data['TS_data']['T_c_err'], fmt='.', label=r'$T_{center}$ %i' % shotn,
-                                       color=color_list[color_count])
-                    axs[3, 0].plot(data['TS_data']['time'], data['TS_data']['We'], label=r'$W_e$ %i' % shotn,
-                                       color=color_list[color_count])
-                    axs[0, 1].legend()
-                    axs[0, 2].legend()
-                    axs[3, 0].legend()
+                axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>V'],
+                                   yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
+                                   color=color_list[color_count])
+                axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>42'],
+                                   yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
+                                   color=color_list[color_count])
+                axs[0, 2].errorbar(data['TS_data']['time'], data['TS_data']['T_max'],
+                                   yerr=data['TS_data']['T_max_err'], fmt='.', label=r'$T_{center}$ %i' % shotn,
+                                   color=color_list[color_count])
+                axs[3, 0].plot(data['TS_data']['time'], data['TS_data']['We'], label=r'$W_e$ %i' % shotn,
+                                   color=color_list[color_count])
+                axs[0, 1].legend()
+                axs[0, 2].legend()
+                axs[3, 0].legend()
             except Exception as error:
-                TS_plot = 1
                 print(error)
-                axs[0, 1].cla()
+                '''axs[0, 1].cla()
                 axs[0, 2].cla()
                 axs[3, 0].cla()
                 axs[0, 1].grid()
                 axs[0, 2].grid()
-                axs[3, 0].grid()
+                axs[3, 0].grid()'''
                 print('No TS data')
 
             axs3[0, 0].plot(data['data']['time'], data['data']['data']['Vp'], label=shotn, color=color_list[color_count])
@@ -395,8 +387,8 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             axs3[3, 1].plot(data['data']['time'], data['data']['data']['Zc'], label=r'$Z_{central}$ %i' % shotn, color=color_list[color_count])
             axs3[3, 1].set_ylabel(r'$Z_{central}, cm$')
 
-            axs3[0, 2].plot(data['data']['time'], data['data']['data']['q'], label=r'$q$ %i' % shotn, color=color_list[color_count])
-            axs3[0, 2].set_ylabel(r'$q$')
+            axs3[0, 2].plot(data['data']['time'], data['data']['data']['Zav'], label=r'$Zav$ %i' % shotn, color=color_list[color_count])
+            axs3[0, 2].set_ylabel(r'$Z_{av}, cm$')
             axs3[1, 2].plot(data['data']['time'], data['data']['data']['a'], label=r'$a$ %i' % shotn, color=color_list[color_count])
             axs3[1, 2].set_ylabel(r'$a$, m')
             axs3[2, 2].plot(data['data']['time'], data['data']['data']['Rx'], '.', label=r'$R_{x}$ %i' % shotn, color=color_list[color_count])
@@ -612,7 +604,7 @@ while True:
         data, shotn, rec = data_open(values)
         if int(shotn*rec):
             draw_data(data, shotn, rec, color_count, TS_plot)
-
+            history_list[shotn] = data
             active_list.append(shotn)
             window['%icheck' %history_ind].update(text='%i' %shotn, value=True, visible=True)
             #window['%icheck2' %history_ind].update(text='%i' %shotn, value=True, visible=True)
@@ -700,7 +692,10 @@ while True:
                 for i in range(len(data['time'])):
                     txt_f.write('%12.4f' %data['time'][i])
                     for key in data['data']:
-                        txt_f.write('%12.4f' % data['data'][key][i])
+                        if data['data'][key]:
+                            txt_f.write('%12.4f' % data['data'][key][i])
+                        else:
+                            txt_f.write('%12s' % 'None')
                     txt_f.write('\n')
             for key in data['data']:
                 to_pack[key] = {
@@ -815,6 +810,20 @@ while True:
                                         text_color='white', visible=True)
             shotn = 0
         av_ne(shotn)
+        axs[0, 1].errorbar(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['<n>V'],
+                           yerr=history_list[shotn]['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
+                           color=color_list[color_count])
+        axs[0, 1].errorbar(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['<n>42'],
+                           yerr=history_list[shotn]['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
+                           color=color_list[color_count])
+        axs[0, 2].errorbar(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['T_max'],
+                           yerr=history_list[shotn]['TS_data']['T_max_err'], fmt='.', label=r'$T_{center}$ %i' % shotn,
+                           color=color_list[color_count])
+        axs[3, 0].plot(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['We'], label=r'$W_e$ %i' % shotn,
+                       color=color_list[color_count])
+        axs[0, 1].legend()
+        axs[0, 2].legend()
+        axs[3, 0].legend()
 
 
 
