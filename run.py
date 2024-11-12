@@ -1,19 +1,20 @@
 import dia_sig
 import matplotlib.pyplot as plt
 
-shotn = 44330
-rec = 44235
+shotn = 40715
+rec = 40668
 
-time_start = 0.190#s
-time_end = 0.191 #s
+time_start = 0.200 #s
+time_end = 0.201 #s
 time_step = 10 #ms
 
 checked_fig, ch_ax = plt.subplots(1,2, sharex=True, figsize=(14,2))
-data = dia_sig.dia_data(shotn, rec, ch_ax, pf2=True)
+data = dia_sig.dia_data(shotn, rec, ch_ax, pf2=False)
 
+print(data['error'])
 plt.show()
 
-with open('c:/work/equilibrium/dia_data/my/%s.txt' %shotn, 'w') as file:
+with open('c:/TkachenkoEE/work/equilibrium/dia_data/my/%s.txt' %shotn, 'w') as file:
     file.write('time,')
     file.write('psidia,')
     file.write('Ip,')

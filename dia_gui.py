@@ -10,6 +10,8 @@ import requests
 from matplotlib.widgets import MultiCursor
 import numpy as np
 
+version = 5.0
+
 
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
@@ -35,8 +37,14 @@ CFM_ADDR = 'http://172.16.12.150:8050/_dash-update-component'
 with open('settings.json', 'r') as set_file:
     settings = json.load(set_file)
 
+indexPath = settings['TS_path']
+
+with open('%sindex.json' % indexPath, 'r') as indFile:
+    index = json.load(indFile)
+
+maxIndexShot = max([int(i) for i in list(index.keys())])
 sg.theme('Material1')
-list_of_checkbokes = [[sg.vtop(sg.Text('История', font=16))]]
+list_of_checkbokes = [[sg.Text('История', font=16), sg.Button('Reset', font=16)]]
 #list_of_checkbokes2 = [[sg.vtop(sg.Text('История', font=16))]]
 for i in range(20):
     list_of_checkbokes.append([sg.vtop(sg.Checkbox('', key='%icheck' %i, font=16, visible=False, enable_events=True))])
@@ -54,7 +62,7 @@ tab1 = [[sg.Column(tab01, expand_x=True, expand_y=True),
 
 '''layout = [[sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
           [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
-          [sg.Button('Ok', font=16), sg.Button('<ne>', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
+          [sg.Button('Ok', font=16), sg.Button('TS', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
           [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
           [sg.TabGroup([
               [sg.Tab('Basic Info', tab01), sg.Tab('Contact Details', tab01)]])],
@@ -63,15 +71,15 @@ tab1 = [[sg.Column(tab01, expand_x=True, expand_y=True),
 '''
 layout = [[sg.Text('Для расчета введите номер разряда и номер вычета', font=16)],
           [sg.Text('Разряд #', font=16), sg.Input(key='-SHOT-', font=16), sg.Text('Вычет #', font=16), sg.Input(key='-RECSHOT-', font=16)],
-          [sg.Button('Ok', font=16), sg.Button('<ne>', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16)],
-          [sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', font=16, visible=False)],
+          [sg.Button('Ok', font=16), sg.Button('TS', font=16), sg.Button('Append', font=16), sg.Button('Save', font=16), sg.Button('Read Me', font=16), sg.Button('Settings', font=16),
+          sg.Text(key='-err_text-', font=16), sg.Button('ReCalc', auto_size_button=True, visible=False), sg.Button('Find', auto_size_button=True, visible=False), sg.Button('Stop', auto_size_button=True, visible=False)],
           [sg.TabGroup([
-              [sg.Tab('General', tab1), sg.Tab('MCC', tab02)]], expand_x=True, expand_y=True)],
+              [sg.Tab('Основные', tab1), sg.Tab('Метод токовых колец', tab02)]], expand_x=True, expand_y=True)],
           [sl_min, sl_max],
           [sg.Text('Created by Tkachenko E.E.', text_color='gray', justification='right', expand_x=True)]
 
 ]
-window = sg.Window('Расчет данных по диамагнитному сигналу', layout, resizable=True, finalize=True)
+window = sg.Window('Расчет данных по диамагнитному сигналу v%.1f' %version, layout, resizable=True, finalize=True)
 
 screen_size = sg.Window.get_screen_size()
 #print(screen_size)
@@ -89,15 +97,32 @@ def make_canvas_interactive(figure_canvas_agg):
     toolbar.update()
     figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
 
+def move_center(window):
+    screen_width, screen_height = window.get_screen_dimensions()
+    win_width, win_height = window.size
+    x, y = (screen_width - win_width)//2, (screen_height - win_height)//2
+    window.move(x, y)
 
 def deffinition():
-    layout = [[sg.Text('Описание кнопок', font=('TimesNewRoman', 20,'bold underline'))],
-                       [sg.vtop(sg.Text('Ok  \n \n \n Append  \n \n Save \n \n\n ReCalc  ', font=('TimesNewRoman', 16,'bold'), justification='right')),
-                        sg.vtop(sg.Text('вывести данные разряда на экран. Можно не вводить номер вычета, \n если файл есть в базе данных, то программа загрузит разряд из базы \n'
-                       '\nдобавить на графики данные введенного разряда \n'
-                                '\n сохранить данные в txt, json и sht файлы. \n Директория по умолчанию: Pub/!!diamagnetic_data/ \n'
-                                '\n пересчитать разряд заново (необходимо ввести номер разряда-вычета', font=16, expand_x=True))],
+    '''layout = [[sg.Text('Описание кнопок', font=('TimesNewRoman', 20,'bold underline'))],
+                       [sg.vtop(sg.Text('Ok \n \n TS \n \n Append \n \n Save \n \n Settings \n \n ReCalc  ', font=('TimesNewRoman', 16,'bold'), justification='right')),
+                        (sg.Text('вывести данные разряда на экран. Можно не вводить номер вычета, если файл есть в базе данных, то программа загрузит разряд из базы \n'
+                       '\n \n загрузить данные диагностики томсоновского рассеяния  \n'
+                       '\n добавить на графики данные введенного разряда \n'
+                                '\n сохранить данные в txt, json и sht файлы. Директория по умолчанию: Pub/!!diamagnetic_data/ \n'
+                                '\n Настройки путей для чтения sht-данных и сохранения расчетов программы. \n Пути сейчас:  \n Папка с SHT-файлами: %s \n Папка с новыми SHT-файлами: %s \n Сохранить в  %s \n'
+                                '\n пересчитать разряд заново (необходимо ввести номер разряда-вычета' %(settings['path_in'], settings['path_in_new'], settings['path_out']), font=16, expand_x=True))],
               [sg.Text('Формулы', font=('TimesNewRoman', 20,'underline bold'))],
+              [sg.Canvas(key='-def-')],
+              [sg.Button('Close')]]'''
+    layout = [[sg.Text('Описание кнопок', font=('TimesNewRoman', 20, 'bold underline'))],
+              [sg.Text('Ok', font=('TimesNewRoman', 16,'bold'), justification='right', size=10), sg.Text('вывести данные разряда на экран. Можно не вводить номер вычета, если файл есть в базе данных, то программа загрузит разряд из базы', font=16, expand_x=True)],
+              [sg.Text('TS', font=('TimesNewRoman', 16,'bold'), justification='right', size=10), sg.Text('загрузить данные диагностики томсоновского рассеяния', font=16, expand_x=True)],
+              [sg.Text('Append', font=('TimesNewRoman', 16,'bold'), justification='right', size=10), sg.Text('добавить на графики данные введенного разряда', font=16, expand_x=True)],
+              [sg.Text('Save', font=('TimesNewRoman', 16,'bold'), justification='right', size=10), sg.Text('сохранить данные в txt, json и sht файлы. Директория по умолчанию: Pub/!!diamagnetic_data/', font=16, expand_x=True)],
+              [sg.Text('Settings', font=('TimesNewRoman', 16,'bold'), justification='right', size=10), sg.Text('Настройки путей для чтения sht-данных и сохранения расчетов программы. \nПути сейчас:  \n     Папка с SHT-файлами: %s \n     Папка с новыми SHT-файлами: %s \n     Сохранить в  %s \n     Папка с данными диагностики ТР: %s'  %(settings['path_in'], settings['path_in_new'], settings['path_out'], settings['TS_path']), font=16, expand_x=True)],
+              [sg.Text('ReCalc', font=('TimesNewRoman', 16,'bold'), justification='right', size=10), sg.Text('пересчитать разряд заново (необходимо ввести номер разряда-вычета)', font=16, expand_x=True)],
+              [sg.Text('Формулы', font=('TimesNewRoman', 20, 'underline bold'))],
               [sg.Canvas(key='-def-')],
               [sg.Button('Close')]]
     figDef, axDef = plt.subplots(1,1, figsize=(8,6))
@@ -122,10 +147,15 @@ def deffinition():
     axDef.get_yaxis().set_visible(False)
     '''axDef.patch.set_alpha(0.9)'''
     figDef.subplots_adjust(left=-0.1, bottom=-0.005, right=1.005, top=1.005, wspace=0, hspace=0)
-    window2 = sg.Window('Read Me', layout, modal=True, finalize=True, resizable=True)
+    window2 = sg.Window('Read Me', layout, finalize=True, resizable=True, auto_save_location=True)
     draw_figure(window2['-def-'].TKCanvas, figDef)
+
+
+    #window2.location = (main_window_x, main_window_y)
+    #window.refresh()
     while True:
         event, values = window2.read()
+
         if event == sg.WIN_CLOSED or event=='Close':
             break
     window2.close()
@@ -135,14 +165,21 @@ def set_page():
     layout = [[sg.Text('Select folder for saving files:')],
               [sg.Input(enable_events=True, key='-IN-',font=('Arial Bold', 12),expand_x=True), sg.FolderBrowse(initial_folder=settings['path_out'], key='br_save')],
               [sg.Button('Save', key='-saving-'), sg.Text('Путь сохранен', key='-saveTxt-', visible=False)],
+
               [sg.Text('Select folder for reading sht files:')],
               [sg.Input(enable_events=True, key='-shtIN-', font=('Arial Bold', 12), expand_x=True),
                sg.FolderBrowse(initial_folder=settings['path_in'], key='br_sht')],
               [sg.Button('Save', key='-shtFolder-'), sg.Text('Путь сохранен', key='-shtTxt-', visible=False)],
+
               [sg.Text('Select folder for reading new sht files:')],
               [sg.Input(enable_events=True, key='-shtNewIN-', font=('Arial Bold', 12), expand_x=True),
                sg.FolderBrowse(initial_folder=settings['path_in_new'], key='br_sht_new')],
-              [sg.Button('Save', key='-shtNewFolder-'), sg.Text('Путь сохранен', key='-shtNewTxt-', visible=False)]
+              [sg.Button('Save', key='-shtNewFolder-'), sg.Text('Путь сохранен', key='-shtNewTxt-', visible=False)],
+
+              [sg.Text('Select folder for reading TS data:')],
+              [sg.Input(enable_events=True, key='-TS_IN-', font=('Arial Bold', 12), expand_x=True),
+               sg.FolderBrowse(initial_folder=settings['TS_path'], key='br_TS')],
+              [sg.Button('Save', key='-TSFolder-'), sg.Text('Путь сохранен', key='-TSTxt-', visible=False)]
               ]
     set_window = sg.Window('Settings', layout=layout)
     while True:
@@ -168,6 +205,11 @@ def set_page():
             with open('settings.json', 'w') as set_new_file:
                 json.dump(settings, set_new_file, indent=2)
             set_window['-shtNewTxt-'].update(visible=True)
+        if event == '-TSFolder-':
+            settings['TS_path'] = str(values['-TS_IN-'])
+            with open('settings.json', 'w') as set_new_file:
+                json.dump(settings, set_new_file, indent=2)
+            set_window['-TSTxt-'].update(visible=True)
         if event == sg.WIN_CLOSED:
             break
     set_window.close()
@@ -195,9 +237,12 @@ def check_page():
         if event == 'Cancel':
             window_check.close()
             return 0
-        if event == sg.WIN_CLOSED or event=='OK':
+        if  event=='OK':
             window_check.close()
             return 1
+        if event == sg.WIN_CLOSED:
+            window_check.close()
+            return -1
     #window_check.close()
 
 
@@ -210,6 +255,9 @@ plot3 = draw_figure(window['-plot3-'].TKCanvas, fig3)
 make_canvas_interactive(plot3)
 color_count = 0
 TS_plot = 1
+legs = [0 ,0]
+legs[0] = fig.legend([], [], loc='outside lower center', ncol=20)
+legs[1] = fig3.legend([], [], loc='outside right upper')
 
 active_list = []
 history_list = {}
@@ -253,7 +301,7 @@ def resize_fig(values):
 
     axs3[1, 1].set_ylim(min_dict['Bv'], max_dict['Bv'])
     axs[0, 0].set_ylim(min_dict['beta_dia'], max_dict['beta_dia'])
-    print(max_dict['shafr_int_meth'])
+    #print(max_dict['shafr_int_meth'])
     axs[2, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
     axs[1, 0].set_ylim(min_dict['W_dia']/1e3, max_dict['W_dia']/1e3)
     #axs[3, 0].set_ylim(0, max_dict['shafr_int_meth']/1e3)
@@ -285,8 +333,8 @@ def resize_fig(values):
     axs3[2, 2].set_ylim(min_dict['Rx'], max_dict['Rx'])
     axs3[3, 2].set_ylim(min_dict['Zx'], max_dict['Zx'])
 
-def av_ne(shotn):
-    TS_path = '//172.16.12.127/Pub/!!!TS_RESULTS/shots/%i/' %shotn
+def av_ne(shotn, data):
+    TS_path = '%s%i/' %(settings['TS_path'], shotn)
     line_ind = 0
     data_TS_dyn = {}
     names_list = []
@@ -324,33 +372,36 @@ def av_ne(shotn):
         window['-err_text-'].update('ВНИМАНИЕ!!! Нет файла с данными ТР. Попробуйте позже или обратитесь к группе ТР', background_color='orange', text_color='white',
                                     visible=True)
 
+    return data
 
-def draw_data(data, shotn, rec, color_count, TS_plot):
+
+def draw_data(data, shotn, rec, color_count):
     try:
         if data['error'] == None:
             #axs[0, 0].plot(data['data']['time'], data['data']['data']['Bt'], label='Bt %i' %shotn, color=color_list[color_count])
             axs3[1, 1].plot(data['data']['time'], data['data']['data']['Bv'], '-', label='Bv %i' %shotn, color=color_list[color_count])
             axs[0, 0].plot(data['data']['time'], data['data']['data']['beta_dia'], label=shotn, color=color_list[color_count])
             axs[1, 0].plot(data['data']['time'], [i/1000 for i in data['data']['data']['W_dia']], label=r'$W_{dia} $ %i' %shotn, color=color_list[color_count])
-            axs[2, 0].plot(data['shafr_int_meth']['time'], [i/1000 for i in data['shafr_int_meth']['W']], '--', label=r'$W_{shafr} $ %i' %shotn, color=color_list[color_count])
+            axs[2, 0].plot(data['shafr_int_meth']['time'], [i/1000 for i in data['shafr_int_meth']['W']], '-', label=r'$W_{shafr} $ %i' %shotn, color=color_list[color_count])
 
             axs[1, 1].plot(data['data']['time'], data['data']['data']['li'], label=shotn, color=color_list[color_count])
 
             try:
                 axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>V'],
-                                   yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
+                                   yerr=data['TS_data']['<n>V_err'], label=r'$<n>_V$',
                                    color=color_list[color_count])
                 axs[0, 1].errorbar(data['TS_data']['time'], data['TS_data']['<n>42'],
-                                   yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
+                                   yerr=data['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$',
                                    color=color_list[color_count])
                 axs[0, 2].errorbar(data['TS_data']['time'], data['TS_data']['T_max'],
                                    yerr=data['TS_data']['T_max_err'], fmt='.', label=r'$T_{center}$ %i' % shotn,
                                    color=color_list[color_count])
                 axs[3, 0].plot(data['TS_data']['time'], data['TS_data']['We'], label=r'$W_e$ %i' % shotn,
                                    color=color_list[color_count])
-                axs[0, 1].legend()
-                axs[0, 2].legend()
-                axs[3, 0].legend()
+                if color_count == 0:
+                    axs[0, 1].legend(loc='lower center')
+                '''axs[0, 2].legend()
+                axs[3, 0].legend()'''
             except Exception as error:
                 print(error)
                 '''axs[0, 1].cla()
@@ -369,13 +420,13 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             #axs[0, 2].plot(data['data']['time'], data['data']['data']['k'], label=shotn, color=color_list[color_count])
             axs3[2, 0].plot(data['data']['time'], data['data']['data']['k'], label=shotn, color=color_list[color_count])
 
-            axs3[3, 0].plot(data['data']['time'], data['data']['data']['tr_up'], label=r'$\delta_{up}$ %i' %shotn, color=color_list[color_count])
-            axs3[3, 0].plot(data['data']['time'], data['data']['data']['tr_down'], '--', label=r'$\delta_{down}$ %i' %shotn, color=color_list[color_count])
+            axs3[3, 0].plot(data['data']['time'], data['data']['data']['tr_up'], label=r'$\delta_{up}$', color=color_list[color_count])
+            axs3[3, 0].plot(data['data']['time'], data['data']['data']['tr_down'], '--', label=r'$\delta_{down}$', color=color_list[color_count])
 
             axs[1, 2].plot(data['data']['time'], data['data']['data']['dEFC'], label=r'$EFC_S - EFC_N $ %i' %shotn, color=color_list[color_count])
             axs[2, 2].plot(data['data']['time'], data['data']['data']['Psi_av'], '-', label=r'$\Psi_{av}$ %i' %shotn, color=color_list[color_count])
-            axs[3, 2].plot(data['data']['time'], data['data']['data']['psiInd'], '-', label=r'$\Delta\Psi_{ind}$ %i' %shotn, color=color_list[color_count])
-            axs[3, 2].plot(data['data']['time'], data['data']['data']['psiRes'], '--', label=r'$\Delta\Psi_{res}$ %i' %shotn, color=color_list[color_count])
+            axs[3, 2].plot(data['data']['time'], data['data']['data']['psiInd'], '-', label=r'$\Delta\Psi_{ind}$', color=color_list[color_count])
+            axs[3, 2].plot(data['data']['time'], data['data']['data']['psiRes'], '--', label=r'$\Delta\Psi_{res}$', color=color_list[color_count])
 
             axs3[1, 0].plot(data['data']['time'], data['data']['data']['Sp'], label=r'$S_p$ %i' % shotn, color=color_list[color_count])
             axs3[1, 0].set_ylabel(r'$S_p, m^2$')
@@ -408,16 +459,16 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             axs[1, 1].set_ylabel(r'$l_{i}$')
             #axs[2, 0].set_ylim(0, 20)
 
-            axs[0, 1].set_ylabel(r'$<n_{e}>_V, m^{-3}$')
+            axs[0, 1].set_ylabel(r'$<n_{e}>, m^{-3}$')
             #axs[3, 0].set_ylim(0, 2)
             axs3[0, 0].set_ylabel(r'$V_{p}, m^{3}$')
-            axs[0, 2].set_ylabel(r'$T_{center}$, eV')
+            axs[0, 2].set_ylabel(r'$T_{e}^{center}$, eV')
             axs3[2, 0].set_ylabel(r'$\kappa$')
             axs3[3, 0].set_ylabel(r'$\delta$')
             axs[1, 2].set_ylabel(r'$EFC_S - EFC_N$')
             axs[2, 2].set_ylabel(r'$\Psi, Wb$')
             axs[3, 2].set_ylabel(r'$\Delta\Psi, Wb$')
-            axs[2, 1].set_ylabel(r'$\beta_{T}, %$')
+            axs[2, 1].set_ylabel(r'$\beta_{T}$')
             axs[3, 1].set_ylabel(r'$\beta_{N}, mm \cdot T / A$')
             #axs[3, 0].set_ylim(0, 2)
             axs[3, 0].set_xlabel('time, s')
@@ -428,10 +479,14 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             axs3[3, 1].set_xlabel('time, s')
             axs3[3, 2].set_xlabel('time, s')
 
+            if color_count == 0:
+                axs[3,2].legend()
+                axs3[3,0].legend()
+
             count =0
             for ax in axs:
                 for subax in ax:
-                    subax.legend(loc='upper left')
+                    #subax.legend(loc='upper left')
                     if count in [3, 4, 5, 9, 10, 11]:
                         #subax.yaxis.set_label_position("right")
                         subax.yaxis.tick_right()
@@ -440,12 +495,17 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             count = 0
             for ax in axs3:
                 for subax in ax:
-                    subax.legend(loc='upper left')
+                    #subax.legend(loc='upper left')
                     if count in [3, 4, 5, 9, 10, 11]:
                         #subax.yaxis.set_label_position("right")
                         subax.yaxis.tick_right()
                     count+=1
             ax_list = []
+            lines, labels = axs[0,0].get_legend_handles_labels()
+            legs[0].remove()
+            legs[1].remove()
+            legs[0] = fig.legend(lines, labels, loc='outside lower center', ncol=20)
+            legs[1] = fig3.legend(lines, labels, loc='outside right upper')
             for ax in axs:
                 ax_list.extend([subax for subax in ax])
             ax_tuple = tuple(ax_list)
@@ -458,16 +518,23 @@ def draw_data(data, shotn, rec, color_count, TS_plot):
             window['-SL_min-'].update(value=(min(data['data']['time'])*1e3))
             '''elif data['error'] == "MCC file does not exist":
             MCC_create(VAL)'''
+
         else:
             window['-err_text-'].update('ОШИБКА!!! %s' %data['error'], background_color='red', text_color='white', visible=True)
+
     except Exception as exep:
         print(exep)
         window['-err_text-'].update('ОШИБКА!!! Введите номер вычета %i и нажмите ReCalc ' %rec, background_color='red', text_color='white',
                                     visible=True)
         window['ReCalc'].update(visible=True)
+        window['Find'].update(visible=True)
 
 
 def data_open(values, ReCalc=False):
+    window['-err_text-'].update('Чтение файлов...', background_color='blue',
+                                text_color='white',
+                                visible=True)
+    window.refresh()
     try:
         shotn = int(values['-SHOT-'])
     except:
@@ -478,10 +545,12 @@ def data_open(values, ReCalc=False):
             rec = int(values['-RECSHOT-'])
         except:
             window['-err_text-'].update('ОШИБКА! Введите целочисленный номер вычета', background_color='red', text_color='white', visible=True)
+            window['Find'].update(visible=True)
             rec = 0
 
         if rec * shotn:
             data = dia_sig.dia_data(shotn, rec, ch_ax)
+            window['-err_text-'].update(visible=False)
             check_page()
             history_list[shotn] = data
         else:
@@ -518,17 +587,19 @@ def data_open(values, ReCalc=False):
                 rec = int(values['-RECSHOT-'])
             except:
                 window['-err_text-'].update('ОШИБКА! Введите целочисленный номер вычета', background_color='red', text_color='white', visible=True)
+                window['Find'].update(visible=True)
                 rec = 0
                 return 0, 0, 0
 
             if rec * shotn:
                 data = dia_sig.dia_data(shotn, rec, ch_ax)
+                window['-err_text-'].update(visible=False)
                 check = check_page()
                 shotn = check*shotn
                 history_list[shotn] = data
     if data:
         if 'TS_data' not in list(data.keys()):
-            av_ne(shotn)
+            data = av_ne(shotn, data)
     return data, shotn, rec
 
 
@@ -563,12 +634,73 @@ def MCC_create(VAL):
         if serv_resp.json()['response']['my-output1']['children'].startswith(' Good! '):
             data, shotn, rec = data_open(VAL)
             if int(shotn * rec):
-                draw_data(data, shotn, rec, color_count, TS_plot)
+                draw_data(data, shotn, rec, color_count)
             mcc_window.close()
         mcc_window['-no_mcc-'].update(serv_resp.json()['response']['children'])
         if event == sg.WIN_CLOSED:
             break
     mcc_window.close()
+
+
+def FindZeroDiscarge(shotn_need):
+    if shotn_need > maxIndexShot:
+        window['-err_text-'].update('К сожалению, этот номер разряда еще не внесён в базу данных по поиску разрядов-вычетов. Обратитесь, пожалуйста, к Ткаченко Екатерине.',
+                                    background_color='red', text_color='white',
+                                    visible=True)
+        return 0, 0, 0
+    for delta in range(2, 500):
+        for ax in ch_ax:
+            ax.cla()
+        checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
+        if delta % 2:
+            shotn = shotn_need + delta // 2
+        else:
+            shotn = shotn_need - delta // 2
+        #print(shotn)
+        window['-err_text-'].update(
+            'Выполняется поиск... %i' %shotn,
+            background_color='blue', text_color='white')
+        window.refresh()
+        event,values = window.read(1)
+        if event == 'Stop':
+            window['-err_text-'].update(
+                'Поиск был принудительно завершен',
+                background_color='red', text_color='white')
+            window.refresh()
+            return 0, 0, 0
+        if 'err' in list(index[str(shotn)].keys()):
+            #print(shotn, index[str(shotn)]['err'])
+            if 'has suspicious file size' in index[str(shotn)]['err']:
+                continue
+            # time.sleep(1)
+            data = dia_sig.dia_data(shotn_need, shotn, ch_ax, pf2=False)
+            if data['error']:
+                #print(data['error'])
+                continue
+            # print(data['error'])
+            #print('ITF ', data['delta_itf'])
+            if abs(data['delta_itf']) < 5000:
+                #print(shotn)
+                #print('ITF ', abs(data['delta_itf']))
+                delta_dia = []
+                for i, t in enumerate(data['delta_dia']['time']):
+                    # print(t)
+                    if t < 0.1:
+                        delta_dia.append(data['delta_dia']['data'][i])
+                    elif t > 0.3:
+                        delta_dia.append(data['delta_dia']['data'][i])
+                if sum(delta_dia) / len(delta_dia) < 0.5:
+                    checkRes = check_page()
+                    #print(checkRes)
+                    if checkRes==1:
+                        #history_list[shotn] = data
+                        if data:
+                            if 'TS_data' not in list(data.keys()):
+                                data = av_ne(shotn, data)
+                                #print(data.keys())
+                        return data, shotn_need, shotn
+                    elif checkRes==-1:
+                        return 0, 0, 0
 
 
 data = {}
@@ -599,14 +731,16 @@ while True:
             for subax in ax:
                 subax.clear()
                 subax.grid()
-        fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
-        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig.subplots_adjust(left=0.05, bottom=0.09, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.910, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values)
         if int(shotn*rec):
-            draw_data(data, shotn, rec, color_count, TS_plot)
+            draw_data(data, shotn, rec, color_count)
             history_list[shotn] = data
             active_list.append(shotn)
             window['%icheck' %history_ind].update(text='%i' %shotn, value=True, visible=True)
+            #window['-err_text-'].update(visible=False)
+            #window['ReCalc'].update(visible=False)
             #window['%icheck2' %history_ind].update(text='%i' %shotn, value=True, visible=True)
             history_ind += 1
 
@@ -621,10 +755,11 @@ while True:
         checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
         data, shotn, rec = data_open(values)
         if int(shotn * rec):
-            draw_data(data, shotn, rec, color_count, TS_plot)
+            draw_data(data, shotn, rec, color_count)
             history_list[shotn] = data
             active_list.append(shotn)
             window['%icheck' % history_ind].update(text='%i' % shotn, value=True, visible=True)
+            #window['-err_text-'].update(visible=False)
             #window['%icheck2' % history_ind].update(text='%i' % shotn, value=True, visible=True)
             history_ind += 1
 
@@ -646,8 +781,10 @@ while True:
             with open('%sjson/%i.json' %(PATH_for_save, shotn), 'w') as json_f:
                 json.dump(for_dump, json_f)
             to_pack = {}
+            #print('yes1')
             for key in data.keys():
-                if key != 'data' and key !='TS_data' and key !='error':
+                #print(key, type(data[key]))
+                if key != 'data' and key !='TS_data' and key != 'dimensions' and type(data[key])==dict:
                     for key2 in data[key].keys():
                         if key2 != 'time' and key2 != 'dimensions':
                             to_pack[key + '_' + key2] = {
@@ -659,8 +796,10 @@ while True:
                                 'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
                                 'y': data[key][key2]
                             }
+                    #print('yes1.1')
                 elif key =='TS_data':
                     for key2 in data[key].keys():
+                        #print(key2)
                         if 'err' not in key2 and key2 != 'time' and key2 != 'dimensions' and key2 != 'We':
                             to_pack[key2] = {
                                 'comment': 'data from %s' %key,
@@ -679,7 +818,9 @@ while True:
                                 'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
                                 'y': data[key][key2]
                             }
+            #print('yes1.2')
             data = data['data']
+            #print('yes2')
             with open('%stxt/%i.txt' %(PATH_for_save, shotn), 'w') as txt_f:
                 txt_f.write('%12s' %'time')
                 for key in data['data']:
@@ -697,7 +838,7 @@ while True:
                         else:
                             txt_f.write('%12s' % 'None')
                     txt_f.write('\n')
-            for key in data['data']:
+            for key in data['data'].keys():
                 to_pack[key] = {
                     'comment': '',
                     'unit': '%s(%s)' %(key, data['dimensions'][key]),
@@ -707,6 +848,7 @@ while True:
                     'yRes': 0.0001,  # ADC resolution: 0.0001 Volt per adc bit
                     'y': data['data'][key]
                 }
+            print('yes3')
             packed = shtRipper.ripper.write(path=(PATH_for_save + 'sht/'), filename='%i.SHT' %shotn, data=to_pack)
             if len(packed) != 0:
                 print('packed error = "%s"' % packed)
@@ -741,12 +883,12 @@ while True:
             for subax in ax:
                 subax.clear()
                 subax.grid()
-        fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
-        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig.subplots_adjust(left=0.05, bottom=0.09, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.91, top=0.983, wspace=0.212, hspace=0)
         data, shotn, rec = data_open(values, ReCalc=True)
         if int(shotn*rec):
             TS_plot = 0
-            draw_data(data, shotn, rec, color_count, TS_plot)
+            draw_data(data, shotn, rec, color_count)
             history_list[shotn] = data
             active_list.append(shotn)
             history_ind-=1
@@ -754,6 +896,43 @@ while True:
            # window['%icheck2' % history_ind].update(text='%i' % shotn, value=True, visible=True)
             history_ind += 1
         #color_count = 0
+
+    if event == 'Find':
+        #window['-err_text-'].update(visible=False)
+        window['-err_text-'].update(
+            'Выполняется поиск...',
+            background_color='blue', text_color='white')
+        window['Find'].update(visible=False)
+        window['Stop'].update(visible=True)
+        #window.read()
+        #history_list[shotn] = {}
+        #active_list.remove(shotn)
+        for ax in ch_ax:
+            ax.cla()
+        checked_fig.subplots_adjust(left=0.062, bottom=0.26, right=0.95, top=0.843, wspace=0.126, hspace=0)
+        for ax in axs:
+            for subax in ax:
+                subax.clear()
+                subax.grid()
+        for ax in axs3:
+            for subax in ax:
+                subax.clear()
+                subax.grid()
+        fig.subplots_adjust(left=0.05, bottom=0.09, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.91, top=0.983, wspace=0.212, hspace=0)
+        data, shotn, rec = FindZeroDiscarge(int(values['-SHOT-']))
+        window['Stop'].update(visible=False)
+        if int(shotn*rec):
+            print(shotn, rec)
+            #window['Find'].update(visible=False)
+            #window['-err_text-'].update(visible=False)
+            draw_data(data, shotn, rec, color_count)
+            history_list[shotn] = data
+            active_list.append(shotn)
+            window['%icheck' %history_ind].update(text='%i' %shotn, value=True, visible=True)
+            #window['%icheck2' %history_ind].update(text='%i' %shotn, value=True, visible=True)
+            history_ind += 1
+
 
     if event == '-SL_min- Release' or event == '-sl-max- Release':
         axs[3,0].set_xlim((values['-SL_min-']/1e3), (values['-sl-max-']/1e3))
@@ -774,7 +953,7 @@ while True:
                 data = history_list[shotn]
                 color_count+=1
                 TS_plot = 1
-                draw_data(data, shotn, 0, color_count, TS_plot)
+                draw_data(data, shotn, 0, color_count)
                 resize_fig(values)
             else:
                 #window['%icheck2' % i].update(False)
@@ -788,20 +967,20 @@ while True:
                     for subax in ax:
                         subax.cla()
                         subax.grid()
-                fig.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
-                fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.95, top=0.983, wspace=0.212, hspace=0)
+                fig.subplots_adjust(left=0.05, bottom=0.09, right=0.95, top=0.983, wspace=0.212, hspace=0)
+                fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.91, top=0.983, wspace=0.212, hspace=0)
                 if active_list:
                     color_count = 0
                     for shot in active_list:
                         data = history_list[shot]
-                        draw_data(data, shot, 0, color_count, TS_plot)
+                        draw_data(data, shot, 0, color_count)
                 else:
                     color_count = 0
                     plot_right.draw()
                     plot3.draw()
 
 
-    if event == '<ne>':
+    if event == 'TS':
         print('buut yes')
         try:
             shotn = int(values['-SHOT-'])
@@ -809,12 +988,12 @@ while True:
             window['-err_text-'].update('ОШИБКА! Введите целочисленный номер разряда', background_color='red',
                                         text_color='white', visible=True)
             shotn = 0
-        av_ne(shotn)
+        data = av_ne(shotn, data)
         axs[0, 1].errorbar(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['<n>V'],
-                           yerr=history_list[shotn]['TS_data']['<n>V_err'], label=r'$<n>_V$ %i' % shotn,
+                           yerr=history_list[shotn]['TS_data']['<n>V_err'], label=r'$<n>_V$',
                            color=color_list[color_count])
         axs[0, 1].errorbar(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['<n>42'],
-                           yerr=history_list[shotn]['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$ %i' % shotn,
+                           yerr=history_list[shotn]['TS_data']['<n>42_err'], fmt='.', label=r'$<n>^{42}_l$',
                            color=color_list[color_count])
         axs[0, 2].errorbar(history_list[shotn]['TS_data']['time'], history_list[shotn]['TS_data']['T_max'],
                            yerr=history_list[shotn]['TS_data']['T_max_err'], fmt='.', label=r'$T_{center}$ %i' % shotn,
@@ -825,9 +1004,32 @@ while True:
         axs[0, 2].legend()
         axs[3, 0].legend()
 
+    if event == 'Reset':
+        active_list = []
+        history_list = {}
+        history_ind = 0
+        color_count = 0
+        for i in range(20):
+            window['%icheck' %i].update(False, visible=False)
+        window['-err_text-'].update(visible=False)
+        window['ReCalc'].update(visible=False)
+        for ax in ch_ax:
+            ax.cla()
+        checked_fig.subplots_adjust(left=0.088, bottom=0.093, right=0.95, top=0.96, wspace=0.126, hspace=0.157)
+        for ax in axs:
+            for subax in ax:
+                subax.clear()
+                subax.grid()
+        for ax in axs3:
+            for subax in ax:
+                subax.clear()
+                subax.grid()
+        fig.subplots_adjust(left=0.05, bottom=0.09, right=0.95, top=0.983, wspace=0.212, hspace=0)
+        fig3.subplots_adjust(left=0.05, bottom=0.06, right=0.91, top=0.983, wspace=0.212, hspace=0)
+        plot_right.draw()
+        plot3.draw()
 
-
-    if event == sg.WIN_CLOSED: # if user closes window or clicks cancel
+    if event == sg.WIN_CLOSED:
         break
 
 window.close()

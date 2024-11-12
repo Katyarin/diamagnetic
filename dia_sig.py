@@ -72,9 +72,16 @@ def dia_data(shot, recoupment, ax, pf2=False):
         data_name_need = ['Ip новый (Пр1ВК) (инт.16)', 'Itf (2TF)(инт.23)', 'Диамагнитный сигнал (новый инт.)', 'Ics (4CS) (инт.22)',
                           'Up (внутреннее 175 петля)', 'Программа тока Ip', 'EFC S (инт. 35)', 'EFC N (инт. 27)', 'Ipf2 верх (7CC) (инт.29)']
 
+    try:
+        data = get_sht_data(shot, data_name_need)
+        #data = get_sht_data(shot, [])
+        #print('shot OK')
+        recoupment_data = get_sht_data(recoupment, data_name_need)
+        #print('rec OK')
+    except Exception as err:
+        return {'data': {}, 'error': err}
 
-    data = get_sht_data(shot, data_name_need)
-    recoupment_data = get_sht_data(recoupment, data_name_need)
+
 
     for Dtype in data_name_need:
         if Dtype not in data:
@@ -91,17 +98,21 @@ def dia_data(shot, recoupment, ax, pf2=False):
         if Dtype not in data:
             print(Dtype)
             data[Dtype] = {'time': data['Ip новый (Пр1ВК) (инт.16)']['time'], 'data': [0]*len(data['Ip новый (Пр1ВК) (инт.16)']['time'])}
+    for Dtype in data_name_need:
+        if Dtype not in recoupment_data:
+            return {'data': {}, 'error': 'no %s in rec shot' %Dtype}
     #fig, ax = plt.subplots(2,1, sharex=True, figsize=(7,5))
     for i in [1,2]:
         ax[i-1].set_title(data_name_need[i])
-        ax[i-1].plot(data[data_name_need[i]]['time'], data[data_name_need[i]]['data'], label='plasma shot')
-        ax[i-1].plot(recoupment_data[data_name_need[i]]['time'], recoupment_data[data_name_need[i]]['data'], label='without plasma')
+        ax[i-1].plot(data[data_name_need[i]]['time'], data[data_name_need[i]]['data'], label='plasma shot #%i' %shot)
+        ax[i-1].plot(recoupment_data[data_name_need[i]]['time'], recoupment_data[data_name_need[i]]['data'], label='without plasma #%i' %recoupment)
         ax[i-1].grid()
         ax[i-1].set_ylabel('Signal, V', fontsize=16)
         ax[i-1].legend()
         ax[i-1].set_xlim(0, 0.4)
     ax[1].set_xlabel('time, s', fontsize=16)
     ax[1].set_ylim(-1, 3)
+    deltaITF = sum([data['Itf (2TF)(инт.23)']['data'][i] - recoupment_data['Itf (2TF)(инт.23)']['data'][i] for i in range(len(data['Itf (2TF)(инт.23)']['time']))])/len(data['Itf (2TF)(инт.23)']['time'])
 
     dia_sig1 = [data['Диамагнитный сигнал (новый инт.)']['data'][i] + data['Ics (4CS) (инт.22)']['data'][i] * 8e-6 for i
                 in range(len(data['Ics (4CS) (инт.22)']['data']))]
@@ -227,7 +238,7 @@ def dia_data(shot, recoupment, ax, pf2=False):
         beta_t_list.append(beta_t)
         beta_N_list.append(1e8*B0*a[j]*beta_t/Ipl)
 
-    print(beta_N_list)
+    #print(beta_N_list)
     psi_ind_min = min(psi_ind_list[:int(len(psi_ind_list)/2)])
     psi_ind_list = [i-psi_ind_min for i in psi_ind_list]
     psi_res_list = [i+psi_ind_min for i in psi_res_list]
@@ -240,4 +251,5 @@ def dia_data(shot, recoupment, ax, pf2=False):
                                             'psiRes': 'Wb', 'beta_t': '%', 'beta_N': 'm*T/A', 'Ipl': 'A', 'Rav': 'm', 'Zav': 'cm', 'k': '%', 'tr_up': '%', 'tr_down': '%', 'Vp': 'm-3',
                                     'Sp': 'm^2', 'a': 'm', 'Zc': 'cm', 'Rx': 'cm', 'Zx': 'cm', 'dEFC': 'V*s', 'pf2_up': 'kA', 'B0': 'T'}},
             'shafr_int_meth': {'time': [i/1000 for i in data_mcc['shafr_int_method']['time']['variable']], 'W': data_mcc['shafr_int_method']['w_eq']['variable'], 'dimensions':{'W': 'J'}},
+            'delta_itf': deltaITF, 'delta_dia': {'time': diamagnetic_sig['time'], 'data': diamagnetic_sig['data'], 'dimensions': {'data': 'V*s'}},
             'error': None}

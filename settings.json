@@ -1,5 +1,6 @@
 {
   "path_in": "//172.16.12.127/Data/sht%i.sht",
   "path_in_new": "//172.16.12.28/Data/sht%i.sht",
-  "path_out": "//172.16.12.127/Pub/!diamagnetic_data/"
+  "path_out": "//172.16.12.127/Pub/!diamagnetic_data/",
+  "TS_path": "//172.16.12.127/Pub/!!!TS_RESULTS/shots/"
 }
