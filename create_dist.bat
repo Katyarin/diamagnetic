@@ -1,1 +1,1 @@
-c:\Users\TkachenkoE\AppData\Local\Programs\Python\Python312\Scripts\pyinstaller.exe --distpath C:\TkachenkoEE\work\Code\diamagnetic\distv5.0 --noconsole C:\TkachenkoEE\work\Code\diamagnetic\dia_gui.py
+c:\Users\TkachenkoE\AppData\Local\Programs\Python\Python312\Scripts\pyinstaller.exe --distpath C:\TkachenkoEE\work\Code\diamagnetic\distv5.7 --noconsole C:\TkachenkoEE\work\Code\diamagnetic\dia_gui.py
